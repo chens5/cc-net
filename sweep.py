@@ -46,12 +46,11 @@ def make_dataset(dataset_cfg: dict):
 
 
 def sweep_run(base_cfg: dict):
-    run = wandb.init(project="primal-dual", dir="/data/sam/wandb")
+    run = wandb.init(entity='primal-dual', project="primal-dual", dir="/data/sam/wandb")
     cfg = apply_sweep_overrides(base_cfg, dict(wandb.config))
 
     # build dataset
     data = datasets.create_knn_dataset_from_base(cfg["dataset"])
-
     train_dataset = [data]
     val_dataset = [data]
 

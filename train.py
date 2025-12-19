@@ -1,6 +1,3 @@
-# from models.models import *
-# from losses.losses import *
-# from datasets.datasets import *
 import models.models as models
 import losses.losses as losses
 import datasets.datasets as datasets
@@ -11,7 +8,9 @@ from torch.optim import Adam, AdamW
 from tqdm import tqdm, trange
 import yaml
 import os
+import argparse
 
+# os.environ['WANDB_API_KEY'] = '395d2fa6b086e2f1063586bbcd6a65f8a14eca9c'
 
 GLOBAL_OUTPUT = '/data/sam/primal-dual'
 
@@ -91,6 +90,7 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
 
     # initialize wandb
     run = wandb.init(
+        entity='primal-dual',
         project='primal-dual',
         dir='/data/sam/wandb',
         config={
@@ -180,10 +180,9 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
     torch.save(model.state_dict(), f'{filepth}/final.pt')
 
 if __name__ == "__main__":
-    wandb.login()
-    project="primal-dual-gnn"
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment', type=str, help='yaml file with experiment configs')
+    args = parser.parse_args()
 
     with open(args.experiment, "r") as f:
         cfg = yaml.safe_load(f)
