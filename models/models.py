@@ -52,9 +52,9 @@ class PDHGLayer(MessagePassing):
         self.projection = projection
     
     def forward(self, h, e, edge_index, w):
-        src, dst = edge_index
-        edge_diff = h[src] - h[dst]
         sqrtw = w.sqrt()
+        src, dst = edge_index
+        edge_diff = sqrtw * (h[src] - h[dst])
 
         '''first equation'''
         edge_up = self.f_edge_up(e)
@@ -63,8 +63,9 @@ class PDHGLayer(MessagePassing):
 
         r = self.lam * sqrtw
         e_proj = self.projection(edge_update, r) #Normalize
+        dual = sqrtw * e_proj
         edge_index = edge_index.long()
-        agg = self.propagate(edge_index, edge_attr=e_proj)
+        agg = self.propagate(edge_index, edge_attr=dual)
         '''second equation'''
         node_input = torch.cat([h, agg], dim=-1)
         h_new = self.f_node_up(node_input)
