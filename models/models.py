@@ -34,7 +34,7 @@ class PDHGLayer(MessagePassing):
                        sigma = 0.1,
                        projection=project_l2, 
                        **kwargs):
-        super().__init__(aggr='mean')
+        super().__init__(aggr='sum')
         '''functions for the equations'''
         self.f_edge_up = Linear(edge_dim, out_dim)
         self.f_edge_agg = Linear(node_dim, out_dim)
@@ -54,13 +54,14 @@ class PDHGLayer(MessagePassing):
     def forward(self, h, e, edge_index, w):
         src, dst = edge_index
         edge_diff = h[src] - h[dst]
+        sqrtw = w.sqrt()
 
         '''first equation'''
         edge_up = self.f_edge_up(e)
         edge_agg = self.f_edge_agg(edge_diff)
         edge_update = edge_up + edge_agg
 
-        r = self.lam * w
+        r = self.lam * sqrtw
         e_proj = self.projection(edge_update, r) #Normalize
         edge_index = edge_index.long()
         agg = self.propagate(edge_index, edge_attr=e_proj)

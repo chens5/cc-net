@@ -16,7 +16,7 @@ model_config:
     sigma: 0.35
 device: cuda:0
 epochs: 100
-loss_function: energy
+loss_function: energy_pdg
 lr: 0.0001
 batch_size: 1
 

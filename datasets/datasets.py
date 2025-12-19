@@ -10,6 +10,10 @@ import graphlearning as gl
 def create_two_moons(n_samples, noise=0.15):
     return datasets.make_moons(n_samples, noise=noise)
 
+def create_image_dset(dataset, metric='raw'):
+    """https://jwcalder.github.io/GraphLearning/datasets.html"""
+    return gl.datasets.load(dataset, metric)
+
 def create_knn_dataset_from_base(cfg):
     params = cfg['params']
     X, labels = globals()[cfg['type']](**params)
@@ -17,3 +21,4 @@ def create_knn_dataset_from_base(cfg):
     W.setdiag(0); W.eliminate_zeros()
     data = utils.graphlearning_to_pyg(X, W)
     return data
+

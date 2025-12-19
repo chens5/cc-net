@@ -6,6 +6,25 @@ def energy(U, X, src, dst, w, lam):
     tv = (U[src] - U[dst]).norm(dim=-1).mul(w).sum()
     return data + lam * tv
 
+def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4):
+    """Primal-dual gap loss."""
+    n = U.size(0)
+    sqrtw = w.sqrt()
+
+    # primal
+    G_u = 0.5 * (U - X).pow(2).sum()
+    F_Ku = lam * (w * (U[src] - U[dst]).norm(dim=-1)).sum()
+
+    # dual
+    KTp = divergence(sqrtw.view(-1,1) * P, src, dst, n)
+    q = -KTp
+    G_star = (q * X).sum() + 0.5 * q.pow(2).sum()
+
+    feasible = (P.norm(dim=-1) <= lam * sqrtw).all() + eps
+    F_star = 0.0 if feasible else float("inf")
+
+    return (G_u + F_Ku + G_star + F_star)
+
 def divergence(p, src, dst, n):
     """Graph divergence: add +p_e at node i=src[e] and -p_e at node j=dst[e]."""
     d = p.size(-1)
@@ -24,17 +43,18 @@ def kkt_residuals(U, P, X, src, dst, w, lam, eps=1e-8):
     """
     n, d = U.shape
     m = P.shape[0]
+    sqrtw = w.sqrt()
 
     # stationarity: (u_i - x_i) + sum_j p_ij = 0
-    stat = (U - X) + divergence(P, src, dst, n)
+    stat = (U - X) + divergence(sqrtw.view(-1,1) * P, src, dst, n)
     stat_abs = stat.norm()
     stat_rel = stat_abs / (X.norm() + eps)
 
     # dual feasibility: ||p_ij|| <= lam * w_ij
     p_norm = P.norm(dim=-1)
-    feas_violation = torch.relu(p_norm - lam * w)
+    feas_violation = torch.relu(p_norm - lam * sqrtw)
     feas_abs = feas_violation.norm()
-    feas_rel = feas_abs / ((lam * w).norm() + eps)
+    feas_rel = feas_abs / ((lam * sqrtw).norm() + eps)
 
     # alignment (only on "active" edges)
     diff = U[src] - U[dst]
@@ -43,7 +63,7 @@ def kkt_residuals(U, P, X, src, dst, w, lam, eps=1e-8):
 
     if active.any():
         dir_vec = diff[active] / diff_norm[active].view(-1, 1)
-        p_target = (lam * w[active]).view(-1, 1) * dir_vec
+        p_target = (lam * sqrtw[active]).view(-1, 1) * dir_vec
         align_res = P[active] - p_target
         align_abs = align_res.norm()
         align_rel = align_abs / (p_target.norm() + eps)
