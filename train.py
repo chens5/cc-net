@@ -64,6 +64,7 @@ def compute_kkt_residuals(val_dataloader, model, lam, eps=1e-8):
 def train(train_dataset, val_dataset, model_config, device, epochs, loss_function, lr, batch_size=1, checkpoint_epoch=10, **kwargs):
     '''
     Training pipeline for model
+    Follow the below format for your model config. 
     model_config = {model: <modeltype>, 
                     cfg: {layer_type: <layer_type>, 
                     in_node_dim: <int>, 
@@ -98,6 +99,17 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
             "loss_function": loss_function,
             "learning_rate": lr
         }
+    ) if wandb.run is None else wandb.run
+
+    wandb.config.update(
+    {
+        "model_config": model_config,
+        "epochs": epochs,
+        "loss_function": loss_function,
+        "learning_rate": lr,
+        "batch_size": batch_size,
+    },
+    allow_val_change=True,
     )
 
     # arrange save file
@@ -170,11 +182,14 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
 if __name__ == "__main__":
     wandb.login()
     project="primal-dual-gnn"
-    
-    with open("configs/example.yaml", "r") as f:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--experiment', type=str, help='yaml file with experiment configs')
+
+    with open(args.experiment, "r") as f:
         cfg = yaml.safe_load(f)
         print(cfg)
 
+    # Add dataset saving
     dataset_cfg = cfg['dataset']
     data = datasets.create_knn_dataset_from_base(dataset_cfg)
 

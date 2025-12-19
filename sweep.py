@@ -1,68 +1,87 @@
-from train import *
-
-import os
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-
+# sweep.py
+import argparse
+import copy
+import yaml
 import wandb
 
-def get_dataset(dataset_name):
-    return 
-
-def get_loss_function(loss_name):
-    return 
+import datasets.datasets as datasets
+from train import train 
 
 
-# Sweep entry point
-def sweep_train():
-    run = wandb.init()
-    cfg = wandb.config
+TOP_LEVEL_KEYS = {"lr", "batch_size", "epochs", "loss_function", "device"}
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def apply_sweep_overrides(base_cfg: dict, sweep_cfg: dict) -> dict:
+    """
+    Merge wandb sweep parameters into your experiment config.
+    Supported overrides:
+      - top-level: lr, batch_size, epochs, loss_function, device
+      - model_config.cfg.* : hidden_dim, num_layers, lam, tau, sigma, etc
+      - dataset.params.* : n_samples, noise, etc
+    """
+    cfg = copy.deepcopy(base_cfg)
 
-    dataset = get_dataset(dataset_name=cfg.dataset_name, batch_size=int(cfg.batch_size))
+    # top-level overrides
+    for k in TOP_LEVEL_KEYS:
+        if k in sweep_cfg:
+            cfg[k] = sweep_cfg[k]
 
-    model_config = {
-        "model": cfg.model_type,
-        "cfg": {
-            "layer_type": cfg.layer_type,
-            "in_node_dim": int(cfg.in_node_dim),
-            "in_edge_dim": int(cfg.in_edge_dim),
-            "hidden_dim": int(cfg.hidden_dim)
-            "num_layers": float(cfg.dropout),
-        }
-    }
+    # nested model_config.cfg overrides
+    for k, v in sweep_cfg.items():
+        if "model_config" in cfg and "cfg" in cfg["model_config"] and k in cfg["model_config"]["cfg"]:
+            cfg["model_config"]["cfg"][k] = v
 
-    loss_fn = get_loss_function(cfg.loss_name)
+    return cfg
 
-    wandb.run.name = f"{cfg.model_type}-{cfg.layer_type}-L{cfg.num_layers}-H{cfg.hidden_dim}-lr{cfg.lr:.1e}"
-    wandb.run.save()
 
-    train(
-        dataset=dataset,
-        model_config=model_config,
-        device=device,
-        epochs=int(cfg.epochs),
-        loss_function=loss_fn,
-        lr=float(cfg.lr),
-    )
+def make_dataset(dataset_cfg: dict):
+    """
+    dataset_cfg format:
+      dataset:
+        type: create_two_moons
+        params: { ... }
+    """
+    fn = getattr(datasets, dataset_cfg["type"])
+    params = dataset_cfg["params"]
+    return fn(**params)
+
+
+def sweep_run(base_cfg: dict):
+    run = wandb.init(project="primal-dual", dir="/data/sam/wandb")
+    cfg = apply_sweep_overrides(base_cfg, dict(wandb.config))
+
+    # build dataset
+    data = datasets.create_knn_dataset_from_base(cfg["dataset"])
+
+    train_dataset = [data]
+    val_dataset = [data]
+
+    # train() will reuse the existing wandb run (because of your tiny change)
+    train(train_dataset, val_dataset, **cfg)
+
+    run.finish()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sweep", type=str, required=True, help="path to wandb sweep yaml")
+    parser.add_argument("--count", type=int, default=1, help="number of runs for this agent")
+    args = parser.parse_args()
+
+    wandb.login()
+
+    with open(args.sweep, "r") as f:
+        full_cfg = yaml.safe_load(f)
+
+    base_cfg = full_cfg["experiment"]
+    sweep_cfg = full_cfg["sweep"]
+
+    sweep_id = wandb.sweep(sweep_cfg, project=sweep_cfg.get("project", "primal-dual"))
+
+    if args.count is None:
+        wandb.agent(sweep_id, function=lambda: sweep_run(base_cfg))
+    else:
+        wandb.agent(sweep_id, function=lambda: sweep_run(base_cfg), count=args.count)
 
 
 if __name__ == "__main__":
-    """
-    Usage:
-      # 1) Create sweep:
-      wandb sweep sweep.yaml
-
-      # 2) Run agents (locally):
-      wandb agent <entity>/<project>/<sweep_id>
-
-    Or programmatically you can do:
-      sweep_id = wandb.sweep(sweep="sweep.yaml", project="YOUR_PROJECT")
-      wandb.agent(sweep_id, function=sweep_train, count=20)
-    """
-    sweep_train()
+    main()
