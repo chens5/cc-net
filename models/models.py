@@ -9,7 +9,7 @@ from torch_geometric.nn import MessagePassing
 import scipy.sparse as sp
 from scipy.sparse import coo_matrix, triu
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from torch_geometric.nn import GCNConv, GATConv
 import torch.nn.functional as F
 from torch.nn import ReLU, LeakyReLU, Sigmoid, SiLU
@@ -22,7 +22,7 @@ def project_l2(q, r):
     """Project each edge-vector row of q onto an ell_2 ball with (per-edge) radius r."""
     eps = 1e-8
     nrm = q.norm(dim=-1, keepdim=True).clamp_min(eps)
-    return q * torch.minimum(torch.ones_like(nrm), r.view(-1,1) / nrm)
+    return (q * torch.minimum(torch.ones_like(nrm), r.view(-1,1) / nrm)).float()
 
 class PDHGLayer(MessagePassing):
     def __init__(self, node_dim, 
@@ -31,7 +31,8 @@ class PDHGLayer(MessagePassing):
                        activation='SiLU',
                        lam=1.0, 
                        tau = 0.35, 
-                       sigma = 0.1, 
+                       sigma = 0.1,
+                       projection=project_l2, 
                        **kwargs):
         super().__init__(aggr='mean')
         '''functions for the equations'''
@@ -48,6 +49,7 @@ class PDHGLayer(MessagePassing):
         self.lam = lam
         self.sigma = sigma
         self.tau = tau
+        self.projection = projection
     
     def forward(self, h, e, edge_index, w):
         src, dst = edge_index
@@ -59,10 +61,9 @@ class PDHGLayer(MessagePassing):
         edge_update = edge_up + edge_agg
 
         r = self.lam * w
-        e_proj = project_l2(edge_update, r) #Normalize
+        e_proj = self.projection(edge_update, r) #Normalize
         edge_index = edge_index.long()
         agg = self.propagate(edge_index, edge_attr=e_proj)
-
         '''second equation'''
         node_input = torch.cat([h, agg], dim=-1)
         h_new = self.f_node_up(node_input)
@@ -87,9 +88,12 @@ class GraphPDHGNet(nn.Module):
                  lam=1.0,
                  tau=0.35,
                  sigma=0.1, 
+                 projection='project_l2',
+                 activation='SiLU',
                  **kwargs):
         super().__init__()
         assert num_layers >= 1
+        self.projection = globals()[projection]
 
         layers = []
 
@@ -102,6 +106,8 @@ class GraphPDHGNet(nn.Module):
                 lam=lam,
                 tau=tau,
                 sigma=sigma,
+                activation=activation,
+                projection=self.projection
             )
         )
 
@@ -115,6 +121,8 @@ class GraphPDHGNet(nn.Module):
                     lam=lam,
                     tau=tau,
                     sigma=sigma,
+                    activation=activation,
+                    projection=self.projection
                 )
             )
         layers.append(PDHGLayer(
@@ -124,6 +132,8 @@ class GraphPDHGNet(nn.Module):
                     lam=lam,
                     tau=tau,
                     sigma=sigma,
+                    activation=activation,
+                    projection=self.projection
                 ))
         self.layers = nn.ModuleList(layers)
         self.hidden_dim = hidden_dim

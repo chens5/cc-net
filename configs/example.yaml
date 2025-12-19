@@ -1,0 +1,22 @@
+dataset:
+  type: create_two_moons
+  params:
+    n_samples: 100
+    noise: 0.15
+model_config:
+  model: GraphPDHGNet
+  cfg:
+    layer_type: PDHGLayer 
+    in_node_dim: 2
+    in_edge_dim: 2
+    hidden_dim: 128
+    num_layers: 4
+    lam: 1.0
+    tau: 0.35
+    sigma: 0.35
+device: cuda:0
+epochs: 100
+loss_function: energy
+lr: 0.0001
+batch_size: 1
+

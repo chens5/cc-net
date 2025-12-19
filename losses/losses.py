@@ -6,6 +6,14 @@ def energy(U, X, src, dst, w, lam):
     tv = (U[src] - U[dst]).norm(dim=-1).mul(w).sum()
     return data + lam * tv
 
+def divergence(p, src, dst, n):
+    """Graph divergence: add +p_e at node i=src[e] and -p_e at node j=dst[e]."""
+    d = p.size(-1)
+    out = torch.zeros(n, d, dtype=p.dtype, device=p.device) # Fixed: Initialize out with p's dtype
+    out.index_add_(0, src,  p)
+    out.index_add_(0, dst, -p)
+    return out
+
 def kkt_residuals(U, P, X, src, dst, w, lam, eps=1e-8):
     """
     Compute KKT residuals for convex clustering:

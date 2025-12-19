@@ -1,4 +1,19 @@
 import sklearn.datasets as datasets
+import scipy.sparse as sp
+from scipy.sparse import coo_matrix, triu
+import torch
+from torch_geometric.data import Data
+from . import dataset_utils as utils
+import graphlearning as gl
+
 
 def create_two_moons(n_samples, noise=0.15):
     return datasets.make_moons(n_samples, noise=noise)
+
+def create_knn_dataset_from_base(cfg):
+    params = cfg['params']
+    X, labels = globals()[cfg['type']](**params)
+    W = gl.weightmatrix.knn(X, k=10, kernel='gaussian')
+    W.setdiag(0); W.eliminate_zeros()
+    data = utils.graphlearning_to_pyg(X, W)
+    return data
