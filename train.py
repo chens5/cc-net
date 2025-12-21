@@ -13,6 +13,7 @@ import argparse
 # os.environ['WANDB_API_KEY'] = '395d2fa6b086e2f1063586bbcd6a65f8a14eca9c'
 
 GLOBAL_OUTPUT = '/data/sam/primal-dual'
+os.environ['WANDB_SILENT']="true"
 
 def make_modelstring(cfg: dict) -> str:
     return (
@@ -35,8 +36,9 @@ def compute_validation_loss(val_dataloader, model, loss_func, lam):
             e_init = batch.x[src] - batch.x[dst]
 
             h, e = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr)
-
-            loss = loss_func(h, batch.x, src,dst,batch.edge_attr,lam=lam,)
+            loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam}
+            loss = loss_func(**loss_terms)
+            # loss = loss_func(h, batch.x, src,dst,batch.edge_attr,lam=lam,)
 
             val_loss += loss.item()
 
@@ -117,6 +119,7 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
     wandb_id = wandb.run.id
     modelstring = make_modelstring(model_config['cfg'])
     filepth = os.path.join(GLOBAL_OUTPUT, 
+                           loss_function,
                            kwargs['dataset']['type'], 
                            model_config['model'], 
                            modelstring, 
@@ -140,13 +143,14 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
                          e=e_init.float(), 
                          edge_index = batch.edge_index, 
                          w=batch.edge_attr)
-            
-            loss = loss_func(h, 
-                             batch.x, 
-                             src, 
-                             dst, 
-                             batch.edge_attr, 
-                             lam=lam)
+            loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam}
+            # loss = loss_func(h, 
+            #                  batch.x, 
+            #                  src, 
+            #                  dst, 
+            #                  batch.edge_attr, 
+            #                  lam=lam)
+            loss = loss_func(**loss_terms)
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
