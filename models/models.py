@@ -52,7 +52,7 @@ class PDHGLayer(MessagePassing):
         self.projection = projection
     
     def forward(self, h, e, edge_index, w):
-        sqrtw = w.sqrt()
+        sqrtw = w.sqrt().view(-1, 1)
         src, dst = edge_index
         edge_diff = sqrtw.unsqueeze(1).float() * (h[src] - h[dst])
 
