@@ -52,9 +52,9 @@ class PDHGLayer(MessagePassing):
         self.projection = projection
     
     def forward(self, h, e, edge_index, w):
-        sqrtw = w.sqrt().view(-1, 1)
+        sqrtw = w.sqrt().view(-1,1)
         src, dst = edge_index
-        edge_diff = sqrtw.unsqueeze(1).float() * (h[src] - h[dst])
+        edge_diff = sqrtw.float() * (h[src] - h[dst])
 
         '''first equation'''
         edge_up = self.f_edge_up(e)
@@ -63,7 +63,7 @@ class PDHGLayer(MessagePassing):
 
         r = self.lam * sqrtw
         e_proj = self.projection(edge_update, r) #Normalize
-        dual = sqrtw.unsqueeze(1).float() * e_proj
+        dual = sqrtw.float() * e_proj
         edge_index = edge_index.long()
         agg = self.propagate(edge_index, edge_attr=dual)
         '''second equation'''
