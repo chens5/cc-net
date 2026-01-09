@@ -10,8 +10,8 @@ from tqdm import tqdm, trange
 import yaml
 import os
 import argparse
+from utils.globals import GLOBAL_OUTPUT, DATA_OUTPUT
 
-GLOBAL_OUTPUT = '/data/sam/primal-dual'
 
 def make_modelstring(cfg: dict) -> str:
     return (
@@ -191,6 +191,7 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--experiment', type=str, help='yaml file with experiment configs')
+    parser.add_argument('--no-cached-data', action='store_true', help='regenerate dataset and ignore previously cached data')
     args = parser.parse_args()
 
     with open(args.experiment, "r") as f:
@@ -203,12 +204,13 @@ if __name__ == "__main__":
 
     # Simple loading and caching data 
     dataset_str = convert_cfgdict_to_str(dataset_cfg)
-    filepth = f'/data/sam/primal-dual/{dataset_str}.pt'
+    filepth = f'/data/sam/primal-dual/data/{dataset_str}.pt'
+    print(os.path.exists(filepth))
     if os.path.isfile(filepth):
         print("Using cached dataset at:", filepth)
         data = torch.load(filepth)
     else:
-        save_dataset(data, dataset_cfg)
+        save_dataset(dataset_cfg, data)
 
     train_dataset = [data]
     val_dataset = [data]

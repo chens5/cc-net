@@ -3,8 +3,8 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import scipy.sparse as sp
 import torch
-
-DATA_OUTPUT = '/data/sam/cc-net/data'
+import os
+from utils.globals import DATA_OUTPUT
 
 def graphlearning_to_pyg(X, W):
     """
@@ -35,7 +35,8 @@ def save_dataset(cfg, dataset):
     cfg is structured as follows:
     {type: <global function for creating dataset>, params: {dataset parameters}}
     """
-    dataset_str = save_dataset(cfg)
+    print(cfg)
+    dataset_str = convert_cfgdict_to_str(cfg)
     datafile = os.path.join(DATA_OUTPUT, dataset_str+'.pt')
     torch.save(dataset,datafile)
     print("saved dataset in :", datafile)
