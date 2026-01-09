@@ -7,10 +7,10 @@ from . import dataset_utils as utils
 import graphlearning as gl
 
 
-def create_two_moons(n_samples, noise=0.15):
+def create_two_moons(n_samples, noise=0.15, **kwargs):
     return datasets.make_moons(n_samples, noise=noise)
 
-def create_image_dset(dataset, metric='raw'):
+def create_image_dset(dataset, metric='raw', **kwargs):
     """https://jwcalder.github.io/GraphLearning/datasets.html"""
     return gl.datasets.load(dataset, metric)
 
@@ -22,6 +22,4 @@ def create_knn_dataset_from_base(cfg):
     data = utils.graphlearning_to_pyg(X, W)
     return data
 
-def get_dataset_from_cache(cfg):
-    return 
 

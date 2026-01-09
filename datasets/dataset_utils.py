@@ -4,6 +4,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
+DATA_OUTPUT = '/data/sam/cc-net/data'
 
 def graphlearning_to_pyg(X, W):
     """
@@ -22,3 +23,19 @@ def graphlearning_to_pyg(X, W):
     edge_index = torch.stack([src, dst])
     X = torch.tensor(X)
     return Data(x=X, edge_index=edge_index, edge_attr=w)
+
+def convert_cfgdict_to_str(cfg):
+    ds_params = cfg['params']
+    config_str = "_".join(f"{k}={v}" for k, v in ds_params.items())
+    return cfg['type'] + '_' + config_str
+
+
+def save_dataset(cfg, dataset):
+    """
+    cfg is structured as follows:
+    {type: <global function for creating dataset>, params: {dataset parameters}}
+    """
+    dataset_str = save_dataset(cfg)
+    datafile = os.path.join(DATA_OUTPUT, dataset_str+'.pt')
+    torch.save(dataset,datafile)
+    print("saved dataset in :", datafile)

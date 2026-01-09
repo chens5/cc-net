@@ -1,6 +1,7 @@
 import models.models as models
 import losses.losses as losses
 import datasets.datasets as datasets
+from datasets.dataset_utils import save_dataset, convert_cfgdict_to_str
 import wandb
 import torch
 from torch_geometric.loader import DataLoader
@@ -10,10 +11,7 @@ import yaml
 import os
 import argparse
 
-# os.environ['WANDB_API_KEY'] = '395d2fa6b086e2f1063586bbcd6a65f8a14eca9c'
-
 GLOBAL_OUTPUT = '/data/sam/primal-dual'
-os.environ['WANDB_SILENT']="true"
 
 def make_modelstring(cfg: dict) -> str:
     return (
@@ -27,10 +25,11 @@ def make_modelstring(cfg: dict) -> str:
         f"_sig{cfg['sigma']}"
     )
 
-def compute_validation_loss(val_dataloader, model, loss_func, lam):
+def compute_validation_loss(val_dataloader, model, loss_func, lam, device):
     val_loss = 0.0
     with torch.no_grad():
         for batch in val_dataloader:
+            batch = batch.to(device)
             src = batch.edge_index[0]
             dst = batch.edge_index[1]
             e_init = batch.x[src] - batch.x[dst]
@@ -46,7 +45,7 @@ def compute_validation_loss(val_dataloader, model, loss_func, lam):
 
     return val_loss
 
-def compute_kkt_residuals(val_dataloader, model, lam, eps=1e-8):
+def compute_kkt_residuals(val_dataloader, model, lam, device, eps=1e-8):
     return_dict = {'stat_rel': 0.0, 'feas_rel': 0.0, 'align_rel': 0.0, 'kkt_rel': 0.0}
     with torch.no_grad():
         for batch in val_dataloader:
@@ -162,8 +161,8 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
             train_loss += loss.item()
         train_loss /= len(train_dataloader)
 
-        validation_loss = compute_validation_loss(val_dataloader, model, loss_func, lam=lam)
-        kkt_res_dict = compute_kkt_residuals(val_dataloader, model, lam)
+        validation_loss = compute_validation_loss(val_dataloader, model, loss_func, lam=lam, device=device)
+        kkt_res_dict = compute_kkt_residuals(val_dataloader, model, lam, device=device)
         wandb.log({
         "train/loss": train_loss,
         "val/loss": validation_loss,
@@ -201,6 +200,15 @@ if __name__ == "__main__":
     # Add dataset saving
     dataset_cfg = cfg['dataset']
     data = datasets.create_knn_dataset_from_base(dataset_cfg)
+
+    # Simple loading and caching data 
+    dataset_str = convert_cfgdict_to_str(dataset_cfg)
+    filepth = f'/data/sam/primal-dual/{dataset_str}.pt'
+    if os.path.isfile(filepth):
+        print("Using cached dataset at:", filepth)
+        data = torch.load(filepth)
+    else:
+        save_dataset(data, dataset_cfg)
 
     train_dataset = [data]
     val_dataset = [data]
