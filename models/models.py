@@ -17,12 +17,8 @@ from torch.nn import ReLU, LeakyReLU, Sigmoid, SiLU
 
 from torch.optim import Adam, AdamW
 from tqdm import trange
+from . import model_utils as mutils
 
-def project_l2(q, r):
-    """Project each edge-vector row of q onto an ell_2 ball with (per-edge) radius r."""
-    eps = 1e-8
-    nrm = q.norm(dim=-1, keepdim=True).clamp_min(eps)
-    return (q * torch.minimum(torch.ones_like(nrm), r.view(-1,1) / nrm)).float()
 
 class PDHGLayer(MessagePassing):
     def __init__(self, node_dim, 
@@ -32,12 +28,13 @@ class PDHGLayer(MessagePassing):
                        lam=1.0, 
                        tau = 0.35, 
                        sigma = 0.1,
-                       projection=project_l2, 
+                       projection='project_l2', 
                        **kwargs):
         super().__init__(aggr='sum')
         '''functions for the equations'''
         self.f_edge_up = Linear(edge_dim, out_dim)
         self.f_edge_agg = Linear(node_dim, out_dim)
+        
         self.activation = globals()[activation]()
         self.f_node_up = nn.Sequential(
             Linear(node_dim + out_dim, out_dim),
@@ -49,7 +46,8 @@ class PDHGLayer(MessagePassing):
         self.lam = lam
         self.sigma = sigma
         self.tau = tau
-        self.projection = projection
+        projection_fn = getattr(mutils, projection)
+        self.projection = projection_fn
     
     def forward(self, h, e, edge_index, w):
         sqrtw = w.sqrt().view(-1, 1)
@@ -95,7 +93,9 @@ class GraphPDHGNet(nn.Module):
                  **kwargs):
         super().__init__()
         assert num_layers >= 1
-        self.projection = globals()[projection]
+        
+        projection_fn = getattr(mutils, projection)
+        self.projection = projection_fn
 
         layers = []
 
@@ -109,7 +109,7 @@ class GraphPDHGNet(nn.Module):
                 tau=tau,
                 sigma=sigma,
                 activation=activation,
-                projection=self.projection
+                projection=projection
             )
         )
 
@@ -124,7 +124,7 @@ class GraphPDHGNet(nn.Module):
                     tau=tau,
                     sigma=sigma,
                     activation=activation,
-                    projection=self.projection
+                    projection=projection
                 )
             )
         layers.append(PDHGLayer(
@@ -135,7 +135,7 @@ class GraphPDHGNet(nn.Module):
                     tau=tau,
                     sigma=sigma,
                     activation=activation,
-                    projection=self.projection
+                    projection=projection
                 ))
         self.layers = nn.ModuleList(layers)
         self.hidden_dim = hidden_dim

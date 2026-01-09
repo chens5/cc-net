@@ -22,3 +22,6 @@ def create_knn_dataset_from_base(cfg):
     data = utils.graphlearning_to_pyg(X, W)
     return data
 
+def get_dataset_from_cache(cfg):
+    return 
+

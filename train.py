@@ -50,6 +50,7 @@ def compute_kkt_residuals(val_dataloader, model, lam, eps=1e-8):
     return_dict = {'stat_rel': 0.0, 'feas_rel': 0.0, 'align_rel': 0.0, 'kkt_rel': 0.0}
     with torch.no_grad():
         for batch in val_dataloader:
+            batch = batch.to(device)
             src = batch.edge_index[0]
             dst = batch.edge_index[1]
             e_init = batch.x[src] - batch.x[dst]
@@ -82,10 +83,14 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 
     # initialize model
+
+    # TODO: fix the model initialization here for EncodeProcessDecode model.
+    # TODO: fix the yaml to be compatible
     model_class = getattr(models, model_config['model'])
     model = model_class(**model_config['cfg'])
     model = model.float()
-    
+    model = model.to(device)
+
     # Set config for lambda
     assert 'lam' in model_config['cfg']
     lam = model_config['cfg']['lam']
@@ -136,6 +141,7 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
         for batch in train_dataloader: 
             # run model here
             optimizer.zero_grad()
+            batch = batch.to(device)
             src = batch.edge_index[0]
             dst = batch.edge_index[1]
             e_init = batch.x[src] - batch.x[dst]

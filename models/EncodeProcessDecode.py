@@ -3,7 +3,8 @@ import torch_geometric as pyg
 from torch_geometric.nn import MLP
 
 class EncodeProcessDecode(torch.nn.Module):
-    def __init__(self, processor,
+    def __init__(self, 
+                 processor,
                  in_node_dim,
                  in_edge_dim,
                  out_dim,
