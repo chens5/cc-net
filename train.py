@@ -149,12 +149,6 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
                          edge_index = batch.edge_index, 
                          w=batch.edge_attr)
             loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam}
-            # loss = loss_func(h, 
-            #                  batch.x, 
-            #                  src, 
-            #                  dst, 
-            #                  batch.edge_attr, 
-            #                  lam=lam)
             loss = loss_func(**loss_terms)
             loss.backward()
             optimizer.step()
@@ -198,23 +192,25 @@ if __name__ == "__main__":
         cfg = yaml.safe_load(f)
         print(cfg)
 
-    # Add dataset saving
-    dataset_cfg = cfg['dataset']
-    data = datasets.create_knn_dataset_from_base(dataset_cfg)
-
+    
     # Simple loading and caching data 
+    # TODO: Fix validation and train dataset tracking 
+    dataset_cfg = cfg['dataset']
     dataset_str = convert_cfgdict_to_str(dataset_cfg)
     filepth = f'/data/sam/primal-dual/data/{dataset_str}.pt'
-    print(os.path.exists(filepth))
-    if os.path.isfile(filepth):
-        print("Using cached dataset at:", filepth)
+
+    if not args.no_cached_data and os.path.isfile(filepth):
+        print("Dataset exists, using cached dataset at:", filepth)
         data = torch.load(filepth)
     else:
+        # Create dataset 
+        constructor = getattr(datasets, dataset_cfg['type'])
+        data = constructor(dataset_cfg)
         save_dataset(dataset_cfg, data)
 
-    train_dataset = [data]
-    val_dataset = [data]
+    # train_dataset = [data]
+    # val_dataset = [data]
 
-    train(train_dataset, val_dataset, **cfg)
+    # train(train_dataset, val_dataset, **cfg)
 
 

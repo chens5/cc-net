@@ -30,13 +30,16 @@ def convert_cfgdict_to_str(cfg):
     return cfg['type'] + '_' + config_str
 
 
-def save_dataset(cfg, dataset):
+def save_dataset(cfg, dataset, which='train'):
     """
     cfg is structured as follows:
     {type: <global function for creating dataset>, params: {dataset parameters}}
+    
+    dataset: list of pytorch geometric data objects
+
+    which: saving train/val
     """
-    print(cfg)
     dataset_str = convert_cfgdict_to_str(cfg)
-    datafile = os.path.join(DATA_OUTPUT, dataset_str+'.pt')
+    datafile = os.path.join(DATA_OUTPUT, f'{dataset_str}-{which}.pt')
     torch.save(dataset,datafile)
     print("saved dataset in :", datafile)

@@ -1,6 +1,7 @@
 dataset:
-  type: create_two_moons
+  type: single_knn
   params:
+    base: two_moons
     n_samples: 100
     noise: 0.15
 model_config:
