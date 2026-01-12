@@ -25,4 +25,3 @@ epochs: 100
 loss_function: energy_pdg
 lr: 0.0001
 batch_size: 1
-
