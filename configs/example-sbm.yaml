@@ -13,8 +13,8 @@ model_config:
   model: GraphPDHGNet
   cfg:
     layer_type: PDHGLayer 
-    in_node_dim: 2
-    in_edge_dim: 2
+    in_node_dim: 16
+    in_edge_dim: 16
     hidden_dim: 128
     num_layers: 4
     lam: 1.0
@@ -25,4 +25,3 @@ epochs: 100
 loss_function: energy_pdg
 lr: 0.0001
 batch_size: 1
-
