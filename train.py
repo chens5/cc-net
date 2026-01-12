@@ -124,7 +124,14 @@ def train(train_dataset, val_dataset,dataset_str, model_config, device,
     # arrange save file
     # OUTPUT_FILE/dataset/model/{modelstring}
     wandb_id = wandb.run.id
-    modelstring = make_modelstring(model_config['cfg'])
+    if model_config['model']=='EncodeProcessDecode':
+        processor_cfg = model_config['cfg']['processor_cfg']
+        processor_cfg['cfg']['in_node_dim'] = model_config['cfg']['embedding_dim']
+        processor_cfg['cfg']['in_edge_dim'] = model_config['cfg']['embedding_dim']
+        processor_cfg['cfg']['lam'] =model_config['cfg']['lam']
+        modelstring = f"{processor_cfg['model']}/{make_modelstring(processor_cfg['cfg'])}_resid={model_config['cfg']['residual_stream']}_steps={model_config['cfg']['recurrent_steps']}"
+    else:
+        modelstring = make_modelstring(model_config['cfg'])
     filepth = os.path.join(GLOBAL_OUTPUT, 
                            loss_function,
                            kwargs['dataset']['type'], 

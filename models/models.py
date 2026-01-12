@@ -14,6 +14,8 @@ from torch_geometric.nn import GCNConv, GATConv
 import torch.nn.functional as F
 from torch.nn import ReLU, LeakyReLU, Sigmoid, SiLU
 
+import torch_geometric as pyg
+from torch_geometric.nn import MLP
 
 from torch.optim import Adam, AdamW
 from tqdm import trange
@@ -92,7 +94,9 @@ class GraphPDHGNet(nn.Module):
                  activation='SiLU',
                  **kwargs):
         super().__init__()
+
         assert num_layers >= 1
+        assert in_node_dim == in_edge_dim 
         
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
@@ -186,3 +190,54 @@ class GNNBaseline(nn.Module):
             x = self.activation(x)
         x = self.output
         return 
+
+class EncodeProcessDecode(torch.nn.Module):
+    def __init__(self, 
+                 processor_cfg,
+                 in_node_dim,
+                 in_edge_dim,
+                 embedding_dim,
+                 lam=1.0, 
+                 mlp_hidden_dim=32,
+                 recurrent_steps = 1,
+                 residual_stream = True
+                ):
+        super().__init__()
+        
+        self.node_encoder = MLP([in_node_dim, mlp_hidden_dim, embedding_dim])
+        self.edge_encoder = MLP([in_edge_dim, mlp_hidden_dim, embedding_dim])
+
+        out_dim = in_node_dim # out_dim=in_node_dim as we need to recover centroids
+        if residual_stream:
+            self.node_decoder = MLP([2 * embedding_dim, mlp_hidden_dim, out_dim])
+            self.edge_decoder = MLP([2 * embedding_dim, mlp_hidden_dim, out_dim])
+        else:
+            self.node_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim])
+            self.edge_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim])
+        
+        # Load processor
+        processor_class = globals()[processor_cfg['model']]
+        # Force the in_dim for processor network to be the same as the embedding dimension
+        proc_in_dim = 2*embedding_dim if residual_stream else embedding_dim
+        processor = processor_class(in_node_dim=proc_in_dim, 
+                                    in_edge_dim=proc_in_dim,
+                                    lam=lam, 
+                                    **processor_cfg['cfg'])
+        self.processor = processor
+
+        self.recurrent_steps = recurrent_steps
+        self.residual_stream = residual_stream
+
+    def forward(self, h, e, edge_index, w, **kwargs):
+        h_input = self.node_encoder(h)
+        e_input = self.edge_encoder(e)
+        h_hidden = h_input
+        e_hidden = e_input
+        for step in range(self.recurrent_steps):
+            if self.residual_stream:
+                h_hidden = torch.cat([h_hidden, h_input], dim=-1)
+                e_hidden = torch.cat([e_hidden, e_input], dim=-1)
+            h_hidden, e_hidden = self.processor(h_hidden, e_hidden, edge_index, w, **kwargs)
+        h_out = self.node_decoder(h_hidden)
+        e_out = self.edge_decoder(e_hidden)
+        return h_out, e_out
