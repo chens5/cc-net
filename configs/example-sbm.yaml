@@ -1,9 +1,12 @@
 dataset:
-  type: single_knn
+  type: gaussian_sbm_dataset
   params:
-    base: two_moons
-    n_samples: 100
-    noise: 0.15
+    n_graphs: 100
+    n_nodes: 200
+    n_clusters: 5
+    p_in: 0.10
+    feature_dim: 16
+    seed: 42
   validation:
     use_train: True
 model_config:

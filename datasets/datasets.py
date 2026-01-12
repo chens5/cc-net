@@ -11,9 +11,6 @@ from torch_geometric.data import Data, Dataset
 from . import dataset_utils as utils
 
 
-# def create_two_moons(n_samples, noise=0.15, **kwargs):
-#     return datasets.make_moons(n_samples, noise=noise)
-
 def two_moons(n_samples, noise=0.15, **kwargs):
     return datasets.make_moons(n_samples, noise=noise)
 
@@ -21,26 +18,13 @@ def images(dataset, metric='raw', **kwargs):
     """https://jwcalder.github.io/GraphLearning/datasets.html"""
     return gl.datasets.load(dataset, metric)
 
-# def create_image_dset(dataset, metric='raw', **kwargs):
-#     """https://jwcalder.github.io/GraphLearning/datasets.html"""
-#     return gl.datasets.load(dataset, metric)
-
-def single_knn(cfg):
-    params = cfg['params']
+def single_knn(params):
     generator = globals()[params['base']]
     X, labels = generator(**params)
     W = gl.weightmatrix.knn(X, k=10, kernel='gaussian')
     W.setdiag(0); W.eliminate_zeros()
     data = utils.graphlearning_to_pyg(X, W)
     return [data]
-
-# def create_knn_dataset_from_base(cfg):
-#     params = cfg['params']
-#     X, labels = globals()[cfg['type']](**params)
-#     W = gl.weightmatrix.knn(X, k=10, kernel='gaussian')
-#     W.setdiag(0); W.eliminate_zeros()
-#     data = utils.graphlearning_to_pyg(X, W)
-#     return data
 
 def _sample_sbm_sparse(block_sizes, probs, rng: np.random.Generator) -> sp.csr_matrix:
     """
@@ -142,7 +126,7 @@ def _laplacian_kappa_from_W(
     kappa = lam_max / max(lam2, 1e-12)
     return float(kappa), float(lam_max), float(lam2)
 
-def create_gaussian_sbm_dataset(
+def _gaussian_sbm_dataset(
     n_graphs: int = 100,
     n_nodes: int = 500,
     n_clusters: int = 5,
@@ -204,3 +188,6 @@ def create_gaussian_sbm_dataset(
         dataset.append(data)
 
     return dataset
+
+def gaussian_sbm_dataset(params):
+    return _gaussian_sbm_dataset(**params)

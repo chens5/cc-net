@@ -5,6 +5,7 @@ import scipy.sparse as sp
 import torch
 import os
 from utils.globals import DATA_OUTPUT
+import shortuuid
 
 def graphlearning_to_pyg(X, W):
     """
@@ -37,9 +38,12 @@ def save_dataset(cfg, dataset, which='train'):
     
     dataset: list of pytorch geometric data objects
 
-    which: saving train/val
+    which: saving train/val/test
     """
     dataset_str = convert_cfgdict_to_str(cfg)
     datafile = os.path.join(DATA_OUTPUT, f'{dataset_str}-{which}.pt')
+    if os.path.exists(datafile):
+        random_short_id = shortuuid.uuid()
+        datafile = os.path.join(DATA_OUTPUT, f'{dataset_str}-{which}-{random_short_id}.pt')
     torch.save(dataset,datafile)
     print("saved dataset in :", datafile)

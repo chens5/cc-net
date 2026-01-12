@@ -62,7 +62,9 @@ def compute_kkt_residuals(val_dataloader, model, lam, device, eps=1e-8):
         return_dict[key] /= len(val_dataloader)
     return return_dict
 
-def train(train_dataset, val_dataset, model_config, device, epochs, loss_function, lr, batch_size=1, checkpoint_epoch=10, **kwargs):
+def train(train_dataset, val_dataset,dataset_str, model_config, device, 
+          epochs, loss_function, lr, batch_size=1, checkpoint_epoch=10, 
+          **kwargs):
     '''
     Training pipeline for model
     Follow the below format for your model config. 
@@ -74,6 +76,7 @@ def train(train_dataset, val_dataset, model_config, device, epochs, loss_functio
                     lam: <float>,
                     etc. }
                     }
+    Check the example.yaml files for how for format the required function parameters
       
     '''
 
@@ -194,23 +197,27 @@ if __name__ == "__main__":
 
     
     # Simple loading and caching data 
-    # TODO: Fix validation and train dataset tracking 
     dataset_cfg = cfg['dataset']
     dataset_str = convert_cfgdict_to_str(dataset_cfg)
-    filepth = f'/data/sam/primal-dual/data/{dataset_str}.pt'
-
-    if not args.no_cached_data and os.path.isfile(filepth):
-        print("Dataset exists, using cached dataset at:", filepth)
-        data = torch.load(filepth)
+    train_filepth = f'{DATA_OUTPUT}/{dataset_str}-train.pt'
+    val_filepth = f'{DATA_OUTPUT}/{dataset_str}-val.pt'
+    if not args.no_cached_data and os.path.isfile(train_filepth) and os.path.isfile(val_filepth):
+        print("Dataset exists, using cached dataset at:", train_filepth, val_filepth)
+        train_dataset = torch.load(train_filepth)
+        val_dataset = torch.load(val_filepth)
     else:
-        # Create dataset 
+        # Create dataset
+        # if the datasets are already created, the new datasets get saved under a uuid
         constructor = getattr(datasets, dataset_cfg['type'])
-        data = constructor(dataset_cfg)
-        save_dataset(dataset_cfg, data)
+        train_dataset = constructor(dataset_cfg['params'])
+        if dataset_cfg['validation']['use_train']:
+            val_dataset = train_dataset
+        else:
+            val_dataset = constructor(dataset_cfg['params'])
+        save_dataset(dataset_cfg, train_dataset, which='train')
+        save_dataset(dataset_cfg, val_dataset, which='val')
 
-    # train_dataset = [data]
-    # val_dataset = [data]
-
-    # train(train_dataset, val_dataset, **cfg)
+    # Train network
+    train(train_dataset=train_dataset, val_dataset=val_dataset, dataset_str=dataset_str, **cfg)
 
 

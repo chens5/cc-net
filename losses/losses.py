@@ -1,13 +1,19 @@
 import torch 
 
 def energy(U, X, src, dst, w, lam, **kwargs):
-    """Objective: 0.5*||U-X||_2^2  +  lam * sum_e w_e ||U_i - U_j||_2."""
+    """
+    Objective: 0.5*||U-X||_2^2  +  lam * sum_e w_e ||U_i - U_j||_2.
+    This returns the primal objective for convex clustering
+    """
     data = 0.5 * (U - X).pow(2).sum()
     tv = (U[src] - U[dst]).norm(dim=-1).mul(w).sum()
     return data + lam * tv
 
 def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4, **kwargs):
-    """Primal-dual gap loss."""
+    """
+    Primal-dual gap loss.
+    
+    """
     n = U.size(0)
     sqrtw = w.sqrt()
 

@@ -1,0 +1,6 @@
+lam: 1.0
+iters: 200
+tau: 0.35
+sigma: 0.35
+dataset_pth: /data/sam/primal-dual/data/gaussian_sbm_dataset_n_graphs=100_n_nodes=200_n_clusters=5_p_in=0.1_feature_dim=16_seed=42-val.pt
+savepth: /data/sam/primal-dual/gaussian_sbm_dataset_n_graphs=100_n_nodes=200
