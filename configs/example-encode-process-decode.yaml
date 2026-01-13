@@ -14,7 +14,7 @@ model_config:
       cfg:
         layer_type: PDHGLayer
         hidden_dim: 128
-        num_layers: 4
+        num_layers: 3
         tau: 0.35
         sigma: 0.35
     in_node_dim: 2

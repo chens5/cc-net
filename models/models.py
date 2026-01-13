@@ -40,7 +40,9 @@ class PDHGLayer(MessagePassing):
         
         self.activation = globals()[activation]()
         self.f_node_up = nn.Sequential(
-            Linear(node_dim + residual_dim + out_dim , out_dim),
+            # Linear(node_dim  + out_dim , out_dim),
+            # Linear(node_dim + residual_dim + out_dim , out_dim),
+            Linear(out_dim, out_dim),
             self.activation,
             Linear(out_dim, out_dim)
         )
@@ -71,8 +73,10 @@ class PDHGLayer(MessagePassing):
         edge_index = edge_index.long()
         agg = self.propagate(edge_index, edge_attr=dual)
         '''second equation'''
+        # node_input = self.nf_linear_layer(h) +  self.aggregation_linear_layer(agg)
         node_input = self.nf_linear_layer(h) + self.residual_linear_layer(x) + self.aggregation_linear_layer(agg)
         # node_input = torch.cat([h, x, agg], dim=-1)
+        # node_input = torch.cat([h, agg], dim=-1)
         h_new = self.f_node_up(node_input)
 
         return h_new, e_proj
@@ -198,7 +202,7 @@ class GNNBaseline(nn.Module):
             x = layer(x, edge_index, edge_attr=w)
             x = self.activation(x)
         x = self.output
-        return 
+        return x, e
 
 class EncodeProcessDecode(torch.nn.Module):
     def __init__(self, 
@@ -210,7 +214,8 @@ class EncodeProcessDecode(torch.nn.Module):
                  mlp_hidden_dim=32,
                  recurrent_steps = 1,
                  residual_stream = True,
-                 load_processor_parameters: str | None = None
+                 load_processor_parameters: str | None = None,
+                 projection='project_l2',
                 ):
         """
         Recurrent encode-processor-decode model.
@@ -245,8 +250,11 @@ class EncodeProcessDecode(torch.nn.Module):
 
         self.recurrent_steps = recurrent_steps
         self.residual_stream = residual_stream
+        self.lam = lam
+        projection_fn = getattr(mutils, projection)
+        self.projection = projection_fn
 
-    def forward(self, h, e, edge_index, w, **kwargs):
+    def forward(self, h, e, edge_index, w, x, **kwargs):
         h_input = self.node_encoder(h)
         e_input = self.edge_encoder(e)
         h_hidden = h_input
@@ -255,7 +263,11 @@ class EncodeProcessDecode(torch.nn.Module):
             if self.residual_stream:
                 h_hidden = torch.cat([h_hidden, h_input], dim=-1)
                 e_hidden = torch.cat([e_hidden, e_input], dim=-1)
-            h_hidden, e_hidden = self.processor(h_hidden, e_hidden, edge_index, w, **kwargs)
+            h_hidden, e_hidden = self.processor(h_hidden, e_hidden, edge_index, w, x=h_input, **kwargs)
         h_out = self.node_decoder(h_hidden)
         e_out = self.edge_decoder(e_hidden)
+
+        sqrtw = w.sqrt().view(-1,1)
+        r = self.lam * sqrtw
+        e_out = self.projection(e_out, r) # Normalization 
         return h_out, e_out
