@@ -26,6 +26,7 @@ class PDHGLayer(MessagePassing):
     def __init__(self, node_dim, 
                        edge_dim, 
                        out_dim,
+                       residual_dim,
                        activation='SiLU',
                        lam=1.0, 
                        tau = 0.35, 
@@ -39,11 +40,14 @@ class PDHGLayer(MessagePassing):
         
         self.activation = globals()[activation]()
         self.f_node_up = nn.Sequential(
-            Linear(node_dim + out_dim, out_dim),
+            Linear(node_dim + residual_dim + out_dim , out_dim),
             self.activation,
             Linear(out_dim, out_dim)
         )
         
+        self.residual_linear_layer = Linear(residual_dim, out_dim)
+        self.nf_linear_layer = Linear(node_dim, out_dim)
+        self.aggregation_linear_layer = Linear(out_dim, out_dim)
 
         self.lam = lam
         self.sigma = sigma
@@ -51,7 +55,7 @@ class PDHGLayer(MessagePassing):
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
     
-    def forward(self, h, e, edge_index, w):
+    def forward(self, h, e, edge_index, w, x):
         sqrtw = w.sqrt().view(-1,1)
         src, dst = edge_index
         edge_diff = sqrtw.float() * (h[src] - h[dst])
@@ -62,12 +66,13 @@ class PDHGLayer(MessagePassing):
         edge_update = edge_up + edge_agg
 
         r = self.lam * sqrtw
-        e_proj = self.projection(edge_update, r) #Normalize
+        e_proj = self.projection(edge_update, r) # Normalization 
         dual = sqrtw.float() * e_proj
         edge_index = edge_index.long()
         agg = self.propagate(edge_index, edge_attr=dual)
         '''second equation'''
-        node_input = torch.cat([h, agg], dim=-1)
+        node_input = self.nf_linear_layer(h) + self.residual_linear_layer(x) + self.aggregation_linear_layer(agg)
+        # node_input = torch.cat([h, x, agg], dim=-1)
         h_new = self.f_node_up(node_input)
 
         return h_new, e_proj
@@ -102,6 +107,7 @@ class GraphPDHGNet(nn.Module):
         self.projection = projection_fn
 
         layers = []
+        residual_dim = in_node_dim
 
         # first layer: input dims -> hidden
         layers.append(
@@ -109,6 +115,7 @@ class GraphPDHGNet(nn.Module):
                 node_dim=in_node_dim,
                 edge_dim=in_edge_dim,
                 out_dim=hidden_dim,
+                residual_dim=in_node_dim,
                 lam=lam,
                 tau=tau,
                 sigma=sigma,
@@ -124,6 +131,7 @@ class GraphPDHGNet(nn.Module):
                     node_dim=hidden_dim,
                     edge_dim=hidden_dim,
                     out_dim=hidden_dim,
+                    residual_dim=in_node_dim,
                     lam=lam,
                     tau=tau,
                     sigma=sigma,
@@ -135,6 +143,7 @@ class GraphPDHGNet(nn.Module):
                     node_dim=hidden_dim,
                     edge_dim=hidden_dim,
                     out_dim=in_node_dim,
+                    residual_dim=in_node_dim,
                     lam=lam,
                     tau=tau,
                     sigma=sigma,
@@ -144,7 +153,7 @@ class GraphPDHGNet(nn.Module):
         self.layers = nn.ModuleList(layers)
         self.hidden_dim = hidden_dim
     
-    def forward(self, h, e, edge_index, w, **kwargs):
+    def forward(self, h, e, edge_index, w, x,**kwargs):
         """
         h: [N, in_node_dim] (or hidden_dim after first layer)
         e: [E, in_edge_dim] (or hidden_dim after first layer)
@@ -152,7 +161,7 @@ class GraphPDHGNet(nn.Module):
         w: [E]
         """
         for layer in self.layers:
-            h, e = layer(h, e, edge_index, w)
+            h, e = layer(h, e, edge_index, w, x)
         return h, e
 
 
@@ -182,7 +191,7 @@ class GNNBaseline(nn.Module):
         self.readout = nn.Linear(hidden_dim, in_node_dim)
         
 
-    def forward(self, h, e, edge_index, w):
+    def forward(self, h, e, edge_index, w, **kwargs):
         x = self.initial(h, edge_index, edge_attr=w)
         x = self.activation(x)
         for layer in self.module_list:
@@ -200,8 +209,13 @@ class EncodeProcessDecode(torch.nn.Module):
                  lam=1.0, 
                  mlp_hidden_dim=32,
                  recurrent_steps = 1,
-                 residual_stream = True
+                 residual_stream = True,
+                 load_processor_parameters: str | None = None
                 ):
+        """
+        Recurrent encode-processor-decode model.
+        Processor config can be 
+        """
         super().__init__()
         
         self.node_encoder = MLP([in_node_dim, mlp_hidden_dim, embedding_dim])
@@ -224,6 +238,10 @@ class EncodeProcessDecode(torch.nn.Module):
                                     lam=lam, 
                                     **processor_cfg['cfg'])
         self.processor = processor
+        if load_processor_parameters is not None:
+            print("Loading model from:", load_processor_parameters)
+            model_state = torch.load(load_processor_parameters)
+            self.processor.load_state_dict(model_state)
 
         self.recurrent_steps = recurrent_steps
         self.residual_stream = residual_stream
