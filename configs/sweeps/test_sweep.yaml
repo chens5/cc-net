@@ -5,7 +5,6 @@ experiment:
     params:
       n_samples: 100
       noise: 0.15
-
   model_config:
     model: GraphPDHGNet
     cfg:
@@ -17,7 +16,6 @@ experiment:
       lam: 1.0
       tau: 0.35
       sigma: 0.35
-
   device: cuda:0
   epochs: 100
   loss_function: energy

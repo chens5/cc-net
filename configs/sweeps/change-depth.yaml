@@ -1,0 +1,61 @@
+# configs/pdhg_two_moons.yaml
+experiment:
+  dataset:
+    type: gaussian_blob_dataset
+    params:
+      n_graphs: 300
+      min_n_nodes: 100
+      max_n_nodes: 200
+      n_clusters: 6
+      k_neighbors: 10
+      feature_dim: 2
+    validation:
+      use_train: True
+  model_config:
+    model: EncodeProcessDecode
+    cfg:
+      processor_cfg:
+        model: GraphPDHGNet
+        cfg:
+          layer_type: PDHGLayer
+          hidden_dim: 128
+          num_layers: 8
+          tau: 0.35
+          sigma: 0.35
+      in_node_dim: 2
+      in_edge_dim: 2
+      embedding_dim: 32
+      mlp_hidden_dim: 128
+      lam: 1.0
+      residual_stream: False
+      recurrent_steps: 1
+  device: cuda:5
+  epochs: 1000
+  loss_function: energy_pdg
+  lr: 0.0001
+  batch_size: 12
+
+
+
+sweep:
+  project: primal-dual
+  method: grid
+
+  metric:
+    name: val/loss
+    goal: minimize
+
+  parameters:
+    lr:
+      values: [1e-4]
+
+    hidden_dim:
+      values: [128]
+    num_layers:
+      values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    lam:
+      values: [1.0]
+    tau:
+      values: [0.35]
+    sigma:
+      values: [0.35]

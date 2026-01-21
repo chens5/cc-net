@@ -133,7 +133,7 @@ def train(train_dataset, val_dataset,dataset_str, model_config, device,
         processor_cfg['cfg']['in_node_dim'] = model_config['cfg']['embedding_dim']
         processor_cfg['cfg']['in_edge_dim'] = model_config['cfg']['embedding_dim']
         processor_cfg['cfg']['lam'] =model_config['cfg']['lam']
-        modelstring = f"{processor_cfg['model']}/{make_modelstring(processor_cfg['cfg'])}_resid={model_config['cfg']['residual_stream']}_steps={model_config['cfg']['recurrent_steps']}"
+        modelstring = f"{processor_cfg['model']}/{make_modelstring(processor_cfg['cfg'])}_resid={model_config['cfg']['residual_stream']}_steps={model_config['cfg']['recurrent_steps']}_featDim={model_config['cfg']['in_node_dim']}"
     else:
         modelstring = make_modelstring(model_config['cfg'])
     filepth = os.path.join(GLOBAL_OUTPUT, 
@@ -229,8 +229,8 @@ if __name__ == "__main__":
             val_dataset = constructor(dataset_cfg['params'])
         save_dataset(dataset_cfg, train_dataset, which='train')
         save_dataset(dataset_cfg, val_dataset, which='val')
-
     # Train network
+    # print(train_dataset)
     train(train_dataset=train_dataset, val_dataset=val_dataset, dataset_str=dataset_str, **cfg)
 
 

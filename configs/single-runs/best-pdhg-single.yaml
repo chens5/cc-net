@@ -1,23 +1,20 @@
 dataset:
-  type: gaussian_sbm_dataset
+  type: single_knn
   params:
-    n_graphs: 1000
-    n_nodes: 200
-    n_clusters: 5
-    p_in: 0.10
-    feature_dim: 16
-    seed: 42
+    base: two_moons
+    n_samples: 100
+    noise: 0.15
   validation:
-    use_train: False
+    use_train: True
 model_config:
   model: EncodeProcessDecode
   cfg:
     processor_cfg:
-      model: GNNBaseline
+      model: GraphPDHGNet
       cfg:
         layer_type: PDHGLayer
         hidden_dim: 128
-        num_layers: 4
+        num_layers: 1
         tau: 0.35
         sigma: 0.35
     in_node_dim: 2
@@ -25,9 +22,9 @@ model_config:
     embedding_dim: 32
     mlp_hidden_dim: 128
     lam: 1.0
-    residual_stream: True
+    residual_stream: False
     recurrent_steps: 1
-device: cuda:0
+device: cuda:4
 epochs: 500
 loss_function: energy_pdg
 lr: 0.0001

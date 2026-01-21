@@ -10,9 +10,16 @@ from scipy.sparse.linalg import eigsh
 from torch_geometric.data import Data, Dataset
 from . import dataset_utils as utils
 
+from tqdm import trange
 
-def two_moons(n_samples, noise=0.15, **kwargs):
-    return datasets.make_moons(n_samples, noise=noise)
+def two_moons(n_samples, noise=0.15, use_range=False, **kwargs):
+    if use_range:
+        min_ = n_samples - n_samples//2
+        max_ = n_samples
+        n_points = np.random.randint(low=min_, high=max_)
+    else:
+        n_points = n_samples
+    return datasets.make_moons(n_points, noise=noise)
 
 def images(dataset, metric='raw', **kwargs):
     """https://jwcalder.github.io/GraphLearning/datasets.html"""
@@ -25,6 +32,24 @@ def single_knn(params):
     W.setdiag(0); W.eliminate_zeros()
     data = utils.graphlearning_to_pyg(X, W)
     return [data]
+
+def multiple_knn(params):
+    generator = globals()[params['base']]
+    try:
+        n_graphs = params['n_graphs']
+    except KeyError as e: 
+        print(f"WARNING: 'n_graphs' not found in dataset parameters, setting n_graphs=1 automatically")
+        n_graphs = 1
+    dataset = []
+    print("Generating dataset....")
+    for _ in trange(n_graphs):
+        X, labels = generator(**params, use_range=True)
+        k_neighbors = np.random.randint(low=5, high=15)
+        W = gl.weightmatrix.knn(X, k=k_neighbors, kernel='gaussian')
+        W.setdiag(0); W.eliminate_zeros()
+        data = utils.graphlearning_to_pyg(X, W)
+        dataset.append(data)
+    return dataset
 
 def _sample_sbm_sparse(block_sizes, probs, rng: np.random.Generator) -> sp.csr_matrix:
     """
@@ -157,7 +182,8 @@ def _gaussian_sbm_dataset(
     y0 = np.concatenate([np.full(s, c, dtype=np.int64) for c, s in enumerate(sizes)])
 
     dataset = []
-    for gi in range(n_graphs):
+    print("Generating dataset....")
+    for gi in trange(n_graphs):
         # sample W
         W = _sample_sbm_sparse(sizes, probs, rng)
 
@@ -189,5 +215,36 @@ def _gaussian_sbm_dataset(
 
     return dataset
 
+def _gaussian_blob_dataset(n_graphs: int = 100,
+                           min_n_nodes: int=200,
+                           max_n_nodes: int = 500,
+                           n_clusters: int = 5,
+                           cluster_std: float = 1.0,
+                           k_neighbors: float = 5,
+                           feature_dim: int = 2, 
+                           **kwargs):
+
+    dataset = []
+    print("Generating dataset..... ")
+    for _ in trange(n_graphs):
+        num_nodes = np.random.randint(low=min_n_nodes, high=max_n_nodes)
+        clusters = np.random.randint(low=2, high=n_clusters)
+        X, _ = datasets.make_blobs(n_samples=num_nodes, 
+                                   n_features=feature_dim, 
+                                   centers=clusters,
+                                   cluster_std = cluster_std,)
+        
+        W = gl.weightmatrix.knn(X, k=k_neighbors, kernel='gaussian')
+        W.setdiag(0); W.eliminate_zeros()
+        W = _patch_to_connected(W)
+
+        data = utils.graphlearning_to_pyg(X, W)
+        dataset.append(data)
+    print("Done!")
+    return dataset
+
 def gaussian_sbm_dataset(params):
     return _gaussian_sbm_dataset(**params)
+
+def gaussian_blob_dataset(params):
+    return _gaussian_blob_dataset(**params)
