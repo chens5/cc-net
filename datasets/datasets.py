@@ -127,6 +127,41 @@ def _patch_to_connected(W: sp.csr_matrix) -> sp.csr_matrix:
     W2.data[:] = 1.0
     return W2
 
+def _apply_gaussian_edge_weights(
+    W: sp.csr_matrix,
+    X: np.ndarray,
+    sigma: float | None = None,
+    scale: float = 4.0,
+) -> tuple[sp.csr_matrix, float]:
+    """
+    Apply symmetric Gaussian kernel weights to existing edges in W: w_{ij} = exp(-4||xi - xj||^2 / sigma)
+    """
+    C = triu(W, k=1).tocoo()
+    if C.nnz == 0:
+        sigma_val = 1.0 if sigma is None else float(sigma)
+        return W.astype(np.float32), sigma_val
+
+    diff = X[C.row] - X[C.col]
+    dist2 = np.einsum("ij,ij->i", diff, diff)
+
+    if sigma is None:
+        sigma_val = float(np.median(dist2))
+    else:
+        sigma_val = float(sigma)
+
+    if not np.isfinite(sigma_val) or sigma_val <= 0.0:
+        sigma_val = 1.0
+
+    weights = np.exp((-scale * dist2) / sigma_val).astype(np.float32)
+
+    row = np.concatenate([C.row, C.col])
+    col = np.concatenate([C.col, C.row])
+    data = np.concatenate([weights, weights])
+    W_weighted = sp.coo_matrix((data, (row, col)), shape=W.shape, dtype=np.float32).tocsr()
+    W_weighted.setdiag(0)
+    W_weighted.eliminate_zeros()
+    return W_weighted, sigma_val
+
 def _laplacian_kappa_from_W(
     W: sp.csr_matrix,
     tol: float = 1e-3,
@@ -160,6 +195,8 @@ def _gaussian_sbm_dataset(
     feature_dim: int = 16,
     feature_sigma: float = 0.5,
     mean_scale: float = 3.0,
+    edge_weight_sigma: float | None = None,
+    edge_weight_scale: float = 4.0,
     compute_kappa: bool = True,
     eigsh_tol: float = 1e-3,
     seed: int = 0,
@@ -168,6 +205,7 @@ def _gaussian_sbm_dataset(
     """
     Returns a list of pyG data objects.
     Each Data has: x, y, edge_index, edge_attr, and condition number info.
+    Edge weights use a symmetric Gaussian kernel on feature distances.
     """
     rng = np.random.default_rng(seed)
 
@@ -200,10 +238,19 @@ def _gaussian_sbm_dataset(
         means = (rng.standard_normal((n_clusters, feature_dim)) * mean_scale).astype(np.float32)
         X = means[y] + (rng.standard_normal((n_nodes, feature_dim)).astype(np.float32) * feature_sigma)
 
+        # weight edges with symmetric Gaussian kernel
+        W, sigma_val = _apply_gaussian_edge_weights(
+            W,
+            X,
+            sigma=edge_weight_sigma,
+            scale=edge_weight_scale,
+        )
+
         # convert to pyg
         data = utils.graphlearning_to_pyg(X, W)
         data.y = torch.from_numpy(y).long()
         data.cluster_means = torch.from_numpy(means)  # [K, d]
+        data.edge_weight_sigma = torch.tensor(sigma_val, dtype=torch.float32)
 
         if compute_kappa:
             kappa, lam_max, lam2 = _laplacian_kappa_from_W(W, tol=eigsh_tol)
