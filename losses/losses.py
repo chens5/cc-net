@@ -26,7 +26,7 @@ def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4, return_parts=False, **kwargs
     q = -KTp
     G_star = (q * X).sum() + 0.5 * q.pow(2).sum()
 
-    feasible = (P.norm(dim=-1) <= lam * sqrtw).all() + eps
+    feasible = (P.norm(dim=-1) <= lam * sqrtw + eps).all().item()
     F_star = 0.0 if feasible else float("inf")
     if return_parts:
         return (G_u + F_Ku + G_star + F_star), G_u, F_Ku

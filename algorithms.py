@@ -22,12 +22,14 @@ def primal_dual(X, src, dst, w, lam=1.0, iters=200, tau=0.35, sigma=0.35, loggin
     """
     Baseline primal dual algorithm
     """
-
+    sqrtw = w.sqrt()
     n, d = X.shape
     m = src.numel()
     U = X.clone()
     P = torch.zeros(m, d)
-    r = lam * w
+
+    #r = lam * w
+    r = lam * sqrtw
     primal_objs = []
     pdgs=[]
     kkt = defaultdict(list)
@@ -35,10 +37,13 @@ def primal_dual(X, src, dst, w, lam=1.0, iters=200, tau=0.35, sigma=0.35, loggin
     for _ in range(iters):
         # dual step (edge-wise projection onto norm ball with radius \lambda w)
         diff = U[src] - U[dst]
-        P = project_l2(P + tau * diff, r)
+        #P = project_l2(P + tau * diff, r)
+        P = project_l2(P + tau * (sqrtw[:, None] * diff), r)
+
         
         # primal step (node update with divergence of dual)
-        U = (U + sigma * (X - divergence(P, src, dst, n))) / (1.0 + sigma)
+        #U = (U + sigma * (X - divergence(P, src, dst, n))) / (1.0 + sigma)
+        U = (U + sigma * (X - divergence(sqrtw[:, None] * P, src, dst, n))) / (1.0 + sigma)
 
         if logging: 
             primal_objective = energy(U, X, src, dst, w, lam).item()
