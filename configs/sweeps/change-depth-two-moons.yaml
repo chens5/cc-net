@@ -1,14 +1,12 @@
 # configs/pdhg_two_moons.yaml
 experiment:
   dataset:
-    type: gaussian_blob_dataset
+    type: single_knn
     params:
-      n_graphs: 300
-      min_n_nodes: 100
-      max_n_nodes: 200
-      n_clusters: 6
-      k_neighbors: 10
-      feature_dim: 2
+      base: two_moons
+      n_samples: 100
+      n_graphs: 1
+      noise: 0.15
     validation:
       use_train: True
   model_config:
@@ -29,11 +27,11 @@ experiment:
       lam: 1.0
       residual_stream: False
       recurrent_steps: 1
-  device: cuda:5
+  device: cuda:2
   epochs: 1000
-  loss_function: energy_pdg
+  loss_function: energy
   lr: 0.0001
-  batch_size: 12
+  batch_size: 64
 
 
 

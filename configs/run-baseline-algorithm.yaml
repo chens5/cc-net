@@ -2,5 +2,5 @@ lam: 1.0
 iters: 500
 tau: 0.35
 sigma: 0.35
-dataset_pth: /data/sam/primal-dual/data/gaussian_blob_dataset_n_graphs=1_min_n_nodes=100_max_n_nodes=200_n_clusters=6_k_neighbors=10_feature_dim=2-val.pt
-savepth: /data/sam/primal-dual/baselines/gaussian_blob_dataset_n_graphs=1_min_n_nodes=100_max_n_nodes=200_n_clusters=6_k_neighbors=10_feature_dim=2-val_lam=1.0
+dataset_pth: /data/sam/primal-dual/data/multiple_knn_base=two_moons_n_samples=200_n_graphs=100_noise=0.15-train.pt
+savepth: /data/sam/primal-dual/data/multiple_knn_base=two_moons_n_samples=200_n_graphs=100_noise=0.15-train.pt_lam=1.0

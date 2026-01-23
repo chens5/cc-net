@@ -3,7 +3,7 @@ dataset:
   params:
     base: two_moons
     n_samples: 200
-    n_graphs: 10
+    n_graphs: 100
     noise: 0.15
   validation:
     use_train: False
@@ -15,17 +15,17 @@ model_config:
       cfg:
         layer_type: PDHGLayer
         hidden_dim: 128
-        num_layers: 8
+        num_layers: 5
         tau: 0.35
         sigma: 0.35
     in_node_dim: 2
     in_edge_dim: 2
     embedding_dim: 32
     mlp_hidden_dim: 128
-    lam: 2.0
+    lam: 0.1
     residual_stream: False
     recurrent_steps: 1
-device: cuda:4
+device: cuda:5
 epochs: 500
 loss_function: energy_pdg
 lr: 0.0001

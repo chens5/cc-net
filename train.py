@@ -28,6 +28,8 @@ def make_modelstring(cfg: dict) -> str:
 def compute_validation_loss(val_dataloader, model, loss_func, lam, device):
     val_loss = 0.0
     primal_obj = 0.0
+    avg_fidelity = 0.0
+    avg_fusion = 0.0
     with torch.no_grad():
         for batch in val_dataloader:
             batch = batch.to(device)
@@ -37,8 +39,10 @@ def compute_validation_loss(val_dataloader, model, loss_func, lam, device):
 
             h, e = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr,x=batch.x.float())
             loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam}
-            loss = loss_func(**loss_terms)
+            loss, fidelity, fusion = loss_func(**loss_terms, return_parts=True)
             primal_obj_ = losses.energy(**loss_terms)
+            avg_fidelity += fidelity.item()
+            avg_fusion += fusion.item()
             # loss = loss_func(h, batch.x, src,dst,batch.edge_attr,lam=lam,)
 
             val_loss += loss.item()
@@ -46,8 +50,9 @@ def compute_validation_loss(val_dataloader, model, loss_func, lam, device):
 
     val_loss /= len(val_dataloader)
     primal_obj /=len(val_dataloader)
-
-    return val_loss, primal_obj
+    avg_fidelity = avg_fidelity/len(val_dataloader)
+    avg_fusion = avg_fusion/len(val_dataloader)
+    return val_loss, primal_obj, avg_fidelity, avg_fusion
 
 def compute_kkt_residuals(val_dataloader, model, lam, device, eps=1e-8):
     return_dict = {'stat_rel': 0.0, 'feas_rel': 0.0, 'align_rel': 0.0, 'kkt_rel': 0.0}
@@ -170,12 +175,14 @@ def train(train_dataset, val_dataset,dataset_str, model_config, device,
             train_loss += loss.item()
         train_loss /= len(train_dataloader)
 
-        validation_loss, primal_objective = compute_validation_loss(val_dataloader, model, loss_func, lam=lam, device=device)
+        validation_loss, primal_objective, fidelity, fusion = compute_validation_loss(val_dataloader, model, loss_func, lam=lam, device=device)
         kkt_res_dict = compute_kkt_residuals(val_dataloader, model, lam, device=device)
         wandb.log({
         "train/loss": train_loss,
         "val/loss": validation_loss,
         "val/primal_objective": primal_objective,
+        "val/fidelity": fidelity,
+        "val/fusion": fusion,
         "val/stationarity": kkt_res_dict['stat_rel'], 
         "val/dual-feasibility": kkt_res_dict['feas_rel'],
         "val/alignment": kkt_res_dict['align_rel'],

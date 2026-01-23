@@ -9,7 +9,7 @@ def energy(U, X, src, dst, w, lam, **kwargs):
     tv = (U[src] - U[dst]).norm(dim=-1).mul(w).sum()
     return data + lam * tv
 
-def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4, **kwargs):
+def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4, return_parts=False, **kwargs):
     """
     Primal-dual gap loss.
     
@@ -28,6 +28,8 @@ def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4, **kwargs):
 
     feasible = (P.norm(dim=-1) <= lam * sqrtw).all() + eps
     F_star = 0.0 if feasible else float("inf")
+    if return_parts:
+        return (G_u + F_Ku + G_star + F_star), G_u, F_Ku
 
     return (G_u + F_Ku + G_star + F_star)
 

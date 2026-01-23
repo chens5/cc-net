@@ -43,7 +43,7 @@ def multiple_knn(params):
     dataset = []
     print("Generating dataset....")
     for _ in trange(n_graphs):
-        X, labels = generator(**params, use_range=True)
+        X, labels = generator(**params, use_range=False)
         k_neighbors = np.random.randint(low=5, high=15)
         W = gl.weightmatrix.knn(X, k=k_neighbors, kernel='gaussian')
         W.setdiag(0); W.eliminate_zeros()

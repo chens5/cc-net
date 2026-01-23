@@ -56,6 +56,14 @@ class PDHGLayer(MessagePassing):
         self.tau = tau
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
+
+    def identity_initialization(self):
+        mlps = [self.f_edge_up, self.f_edge_agg, self.f_node_up, self.residual_linear_layer, self.nf_linear_layer, self.aggregation_linear_layer]
+        with torch.no_grad():
+            for mlp in mlps:
+                mlp.zero_()
+                k = min(mlp.weight.shape)
+                mlp.weight[:k, :k] = torch.eye(k)
     
     def forward(self, h, e, edge_index, w, x):
         sqrtw = w.sqrt().view(-1,1)
@@ -156,6 +164,11 @@ class GraphPDHGNet(nn.Module):
                 ))
         self.layers = nn.ModuleList(layers)
         self.hidden_dim = hidden_dim
+        
+    def identity_initialization(self):
+        with torch.no_grad:
+            for layer in self.layers:
+                layer.identity_initialization()
     
     def forward(self, h, e, edge_index, w, x,**kwargs):
         """
