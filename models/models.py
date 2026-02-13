@@ -82,7 +82,7 @@ class PDHGLayer(MessagePassing):
         agg = self.propagate(edge_index, edge_attr=dual)
         '''second equation'''
         # node_input = self.nf_linear_layer(h) +  self.aggregation_linear_layer(agg)
-        node_input = self.nf_linear_layer(h) + self.residual_linear_layer(x) + self.aggregation_linear_layer(agg)
+        node_input = self.nf_linear_layer(h.float()) + self.residual_linear_layer(x.float()) + self.aggregation_linear_layer(agg.float())
         # node_input = torch.cat([h, x, agg], dim=-1)
         # node_input = torch.cat([h, agg], dim=-1)
         h_new = self.f_node_up(node_input)
@@ -200,21 +200,21 @@ class GNNBaseline(nn.Module):
         # Initializing the activation function
         self.activation=globals()[activation]()
 
-        self.initial = graph_layer(in_node_dim, hidden_dim, edge_dim=in_edge_dim, heads=heads)
-
-        self.module_list = nn.ModuleList([graph_layer(hidden_dim, hidden_dim, edge_dim=edge_dim) for _ in range()])
+        self.initial = graph_layer(in_node_dim, hidden_dim, edge_dim=1, heads=heads, concat=False)
+        self.module_list = nn.ModuleList([graph_layer(hidden_dim, hidden_dim, edge_dim=1, concat=False) for _ in range(num_layers)])
 
         # Readout layer
         self.readout = nn.Linear(hidden_dim, in_node_dim)
         
 
     def forward(self, h, e, edge_index, w, **kwargs):
-        x = self.initial(h, edge_index, edge_attr=w)
+
+        x = self.initial(x=h, edge_index=edge_index.long(), edge_attr=w)
         x = self.activation(x)
         for layer in self.module_list:
-            x = layer(x, edge_index, edge_attr=w)
+            x = layer(x=x, edge_index=edge_index.long(), edge_attr=w)
             x = self.activation(x)
-        x = self.output
+        x = self.readout(x)
         return x, e
 
 class EncodeProcessDecode(torch.nn.Module):

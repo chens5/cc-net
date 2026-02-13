@@ -11,7 +11,7 @@ import yaml
 import os
 import argparse
 from utils.globals import GLOBAL_OUTPUT, DATA_OUTPUT
-
+os.environ['WANDB_API_KEY'] = '395d2fa6b086e2f1063586bbcd6a65f8a14eca9c'
 
 def make_modelstring(cfg: dict) -> str:
     return (
@@ -37,16 +37,16 @@ def compute_validation_loss(val_dataloader, model, loss_func, lam, device):
             dst = batch.edge_index[1]
             e_init = batch.x[src] - batch.x[dst]
 
-            h, e = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr,x=batch.x.float())
-            loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam}
-            loss, fidelity, fusion = loss_func(**loss_terms, return_parts=True)
-            primal_obj_ = losses.energy(**loss_terms)
-            avg_fidelity += fidelity.item()
-            avg_fusion += fusion.item()
+            h, e = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr.float(),x=batch.x.float())
+            loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam, 'gt_U': batch.U, 'gt_P':batch.P}
+            loss = loss_func(**loss_terms)
+            primal_obj_,fidelity, fusion = losses.energy(**loss_terms, return_parts = True)
+            avg_fidelity += fidelity.item()/batch.num_graphs
+            avg_fusion += fusion.item()/batch.num_graphs
             # loss = loss_func(h, batch.x, src,dst,batch.edge_attr,lam=lam,)
 
-            val_loss += loss.item()
-            primal_obj += primal_obj_.item()
+            val_loss += loss.item()/batch.num_graphs
+            primal_obj += primal_obj_.item()/batch.num_graphs
 
     val_loss /= len(val_dataloader)
     primal_obj /=len(val_dataloader)
@@ -63,7 +63,7 @@ def compute_kkt_residuals(val_dataloader, model, lam, device, eps=1e-8):
             dst = batch.edge_index[1]
             e_init = batch.x[src] - batch.x[dst]
 
-            h, e = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr, x=batch.x.float())
+            h, e = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr.float(), x=batch.x.float())
             kkt_dict = losses.kkt_residuals(h, e, batch.x, src, dst, batch.edge_attr, lam)
             for key in return_dict:
                 return_dict[key] += kkt_dict[key]
@@ -165,11 +165,11 @@ def train(train_dataset, val_dataset,dataset_str, model_config, device,
             e_init = batch.x[src] - batch.x[dst]
             h, e = model(h=batch.x.float(), 
                          e=e_init.float(), 
-                         edge_index = batch.edge_index, 
-                         w=batch.edge_attr,
+                         edge_index=batch.edge_index, 
+                         w=batch.edge_attr.float(),
                          x=batch.x.float())
-            loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam}
-            loss = loss_func(**loss_terms)
+            loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam, 'gt_U': batch.U, 'gt_P':batch.P}
+            loss = loss_func(**loss_terms)/batch.num_graphs
             loss.backward()
             optimizer.step()
             train_loss += loss.item()

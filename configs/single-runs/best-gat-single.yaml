@@ -4,17 +4,18 @@ dataset:
     base: two_moons
     n_samples: 100
     noise: 0.15
+    lam: 1.0
   validation:
     use_train: True
 model_config:
   model: EncodeProcessDecode
   cfg:
     processor_cfg:
-      model: GraphPDHGNet
+      model: GNNBaseline
       cfg:
-        layer_type: PDHGLayer
+        layer_type: GATConv
         hidden_dim: 128
-        num_layers: 5
+        num_layers: 2
         tau: 0.35
         sigma: 0.35
     in_node_dim: 2
@@ -26,7 +27,7 @@ model_config:
     recurrent_steps: 1
 device: cuda:4
 epochs: 500
-loss_function: energy_pdg
+loss_function: energy
 lr: 0.0001
 batch_size: 1
 

@@ -1,12 +1,29 @@
 import torch 
 
-def energy(U, X, src, dst, w, lam, **kwargs):
+def pdhg_supervised(U, gt_U, P, gt_P, return_parts=False, **kwargs):
+    primal_loss = 0.5 * (U - gt_U).pow(2).sum()
+    dual_loss = 0.5 * (P - gt_P).pow(2).sum()
+    return primal_loss + dual_loss
+
+def primal_supervised(U, gt_U,**kwargs):
+    primal_loss = torch.linalg.norm(U - gt_U, dim=1).sum()
+    return primal_loss 
+
+def pdhg_supervised_with_energy_pdg(U, gt_U, P, gt_P, X, src, dst, w, lam, **kwargs):
+    primal_loss = 0.5 * (U - gt_U).pow(2).sum()
+    dual_loss = 0.5 * (P - gt_P).pow(2).sum()
+    pdg = energy_pdg(U, X, P, src, dst, w, lam)
+    return primal_loss + dual_loss + pdg
+
+def energy(U, X, src, dst, w, lam, return_parts=False, **kwargs):
     """
     Objective: 0.5*||U-X||_2^2  +  lam * sum_e w_e ||U_i - U_j||_2.
     This returns the primal objective for convex clustering
     """
     data = 0.5 * (U - X).pow(2).sum()
     tv = (U[src] - U[dst]).norm(dim=-1).mul(w).sum()
+    if return_parts:
+        return data + lam * tv, data, lam * tv
     return data + lam * tv
 
 def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4, return_parts=False, **kwargs):
@@ -19,6 +36,7 @@ def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4, return_parts=False, **kwargs
 
     # primal
     G_u = 0.5 * (U - X).pow(2).sum()
+    
     F_Ku = lam * (w * (U[src] - U[dst]).norm(dim=-1)).sum()
 
     # dual
@@ -29,7 +47,7 @@ def energy_pdg(U, X, P, src, dst, w, lam, eps=1e-4, return_parts=False, **kwargs
     feasible = (P.norm(dim=-1) <= lam * sqrtw + eps).all().item()
     F_star = 0.0 if feasible else float("inf")
     if return_parts:
-        return (G_u + F_Ku + G_star + F_star), G_u, F_Ku
+       return (G_u + F_Ku + G_star + F_star), G_u, F_Ku
 
     return (G_u + F_Ku + G_star + F_star)
 

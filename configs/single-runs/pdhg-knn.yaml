@@ -5,6 +5,7 @@ dataset:
     n_samples: 200
     n_graphs: 100
     noise: 0.15
+    lam: 1.0
   validation:
     use_train: False
 model_config:
@@ -22,12 +23,12 @@ model_config:
     in_edge_dim: 2
     embedding_dim: 32
     mlp_hidden_dim: 128
-    lam: 0.1
+    lam: 1.0
     residual_stream: False
     recurrent_steps: 1
 device: cuda:5
 epochs: 500
-loss_function: energy_pdg
+loss_function: primal_supervised
 lr: 0.0001
 batch_size: 12
 

@@ -48,6 +48,9 @@ def multiple_knn(params):
         W = gl.weightmatrix.knn(X, k=k_neighbors, kernel='gaussian')
         W.setdiag(0); W.eliminate_zeros()
         data = utils.graphlearning_to_pyg(X, W)
+        U, P = utils.get_pdhg_labels(data, params['lam'])
+        data.U = U
+        data.P = P
         dataset.append(data)
     return dataset
 
@@ -290,7 +293,7 @@ def _gaussian_blob_dataset(n_graphs: int = 100,
     print("Done!")
     return dataset
 
-def gaussian_sbm_dataset(params):
+def gaussian_sbm_dataset(params):    
     return _gaussian_sbm_dataset(**params)
 
 def gaussian_blob_dataset(params):
