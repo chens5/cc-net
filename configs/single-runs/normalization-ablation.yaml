@@ -1,0 +1,33 @@
+dataset:
+  type: single_knn
+  params:
+    base: two_moons
+    n_samples: 100
+    noise: 0.15
+  validation:
+    use_train: True
+model_config:
+  model: EncodeProcessDecode
+  cfg:
+    processor_cfg:
+      model: GraphPDHGNet
+      cfg:
+        layer_type: PDHGLayer
+        hidden_dim: 128
+        num_layers: 1
+        tau: 0.35
+        sigma: 0.35
+        projection: identity
+    in_node_dim: 2
+    in_edge_dim: 2
+    embedding_dim: 32
+    mlp_hidden_dim: 128
+    lam: 1.0
+    residual_stream: False
+    recurrent_steps: 1
+device: cpu
+epochs: 2000
+loss_function: energy_pdg
+lr: 0.0001
+batch_size: 1
+
