@@ -12,6 +12,135 @@ from . import dataset_utils as utils
 
 from tqdm import trange
 
+def generate_wordnet_embeddings():
+    import nltk
+    import gensim.downloader as gensim_api
+    from nltk.corpus import wordnet as wn
+    nltk.download("wordnet")
+    model = api.load("word2vec-google-news-300")
+
+    wordnet_words = sorted({
+    lemma.name().lower()
+    for synset in wn.all_synsets(pos=wn.NOUN)
+    for lemma in synset.lemmas()
+    if "_" not in lemma.name()
+    })
+
+    # Keep only words that have embeddings
+    words = [w for w in wordnet_words if w in model]
+
+    # Matrix of embeddings
+    X = np.stack([model[w] for w in words])
+
+    print(len(words))
+    print(X.shape)
+    return  
+
+### Functions for generating hierarchical gaussian dataset. 
+def generate_recursive_hierarchy(
+    branching,
+    points_per_leaf=50,
+    level_scales=None,
+    dim=2,
+    random_state=None,
+):
+    """
+    branching: list like [3, 4, 2]
+        3 clusters at level 1, each with 4 at level 2, each with 2 at level 3
+    level_scales: list like [12.0, 4.0, 1.0]
+        spread used at each level
+    """
+
+    if level_scales is None:
+        level_scales = [10 / (2**i) for i in range(len(branching))]
+
+    X = []
+    labels = []
+
+    def recurse(center, level, path):
+        if level == len(branching):
+            pts = np.random.normal(loc=center, scale=level_scales[-1], size=(points_per_leaf, dim))
+            X.append(pts)
+            labels.extend([tuple(path)] * points_per_leaf)
+            return
+
+        children = np.random.normal(
+            loc=center,
+            scale=level_scales[level],
+            size=(branching[level], dim),
+        )
+
+        for j, child_center in enumerate(children):
+            recurse(child_center, level + 1, path + [j])
+
+    root = np.zeros(dim)
+    recurse(root, 0, [])
+
+    return np.vstack(X), labels
+
+def _generate_hierarchical_blobs(n_graphs, branching,normalize=True, points_per_leaf=20, level_scales=None, dim=2, seed=42,k=10, **kwargs):
+    dataset = []
+    for _ in trange(n_graphs):
+        X, labels = generate_recursive_hierarchy(
+            branching=branching,
+            points_per_leaf=points_per_leaf,
+            level_scales=level_scales,
+            dim=dim,
+            random_state=seed,
+        )
+        if normalize:
+            X = X - X.mean(axis=0, keepdims=True)
+            r = np.linalg.norm(X, axis=1).max()
+            X = X / max(r, 1e-12)
+        W = gl.weightmatrix.knn(X, k=k, kernel='gaussian')
+        W.setdiag(0); W.eliminate_zeros()
+        W = _patch_to_connected(W)
+        data = utils.graphlearning_to_pyg(X, W)
+        data.labels = labels
+        dataset.append(data)
+    return dataset
+
+def hierarchical_blobs(params):
+    return _generate_hierarchical_blobs(**params)
+
+
+#### Functions for generating Fashion MNIST
+def _fashion_mnist(n_graphs, n_samples=500, which="train", seed=42,k=10, **kwargs):
+    points, labels = gl.datasets.load('fashionmnist', metric='vae')
+    train_frac = 0.80
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(len(points))
+
+    n_train = int(train_frac * len(points))
+    train_idx = perm[:n_train]
+    test_idx = perm[n_train:]
+
+    if which == "train":
+        idx = train_idx
+    elif which == "test" or which == "val":
+        idx = test_idx
+    else:
+        raise ValueError(f"which must be 'train' or 'test', got {which}")
+    pts = points[idx]
+    lbls = labels[idx]
+
+    W = gl.weightmatrix.knn(pts, k=k, kernel="gaussian")
+    W.setdiag(0)
+    W.eliminate_zeros()
+    dataset = []
+    for _ in range(n_graphs):
+        subgraph_idx = rng.choice(pts.shape[0], size=n_samples, replace=False)
+        points_sampled = pts[subgraph_idx]
+        W_sampled = W[subgraph_idx][:, subgraph_idx]
+        W_sampled = _patch_to_connected(W_sampled)
+        data = utils.graphlearning_to_pyg(points_sampled, W_sampled)
+        dataset.append(data)
+
+    return dataset
+
+def fashion_mnist(params):
+    return _fashion_mnist(**params)
+
 def two_moons(n_samples, noise=0.15, use_range=False, **kwargs):
     if use_range:
         min_ = n_samples - n_samples//2

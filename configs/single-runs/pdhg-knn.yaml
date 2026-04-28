@@ -28,7 +28,7 @@ model_config:
     recurrent_steps: 1
 device: cuda:5
 epochs: 500
-loss_function: primal_supervised
+loss_function: energy_pdg
 lr: 0.0001
 batch_size: 12
 

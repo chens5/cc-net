@@ -1,0 +1,28 @@
+dataset:
+  type: multiple_knn
+  params:
+    base: two_moons
+    n_samples: 200
+    n_graphs: 100
+    noise: 0.15
+    lam: 1.0
+  validation:
+    use_train: False
+model_config:
+
+  model: GraphPDHGNet
+  cfg:
+    layer_type: PDHGLayer
+    hidden_dim: 128
+    num_layers: 5
+    tau: 0.35
+    sigma: 0.35
+    in_node_dim: 2
+    in_edge_dim: 2
+    lam: 1.0
+device: cuda:5
+epochs: 500
+loss_function: energy_pdg
+lr: 0.0001
+batch_size: 12
+

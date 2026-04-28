@@ -1,0 +1,38 @@
+dataset:
+  type: hierarchical_blobs
+  params:
+    n_graphs: 1000
+    branching: [2, 2, 2]
+    level_scales: [15.0, 6.0, 2.0]
+    points_per_leaf: 10
+    seed: 42
+    k: 15
+    normalize: True
+  validation:
+    use_train: True
+model_config:
+  model: EncodeProcessDecode
+  cfg:
+    processor_cfg:
+      model: GraphPDHGNet
+      cfg:
+        layer_type: PDHGLayer
+        hidden_dim: 256
+        num_layers: 3
+        tau: 0.35
+        sigma: 0.35
+        negative_dual: False
+    in_node_dim: 2
+    in_edge_dim: 2
+    embedding_dim: 128
+    mlp_hidden_dim: 128
+    lam: 1.0
+    residual_stream: False
+    recurrent_steps: 1
+device: cuda:4
+epochs: 500
+loss_function: energy_pdg
+lr: 0.0001
+batch_size: 64
+identity_initialization: True
+

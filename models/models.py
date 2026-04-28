@@ -31,7 +31,8 @@ class PDHGLayer(MessagePassing):
                        lam=1.0, 
                        tau = 0.35, 
                        sigma = 0.1,
-                       projection='project_l2', 
+                       projection='project_l2',
+                       negative_dual=False,  
                        **kwargs):
         super().__init__(aggr='sum')
         '''functions for the equations'''
@@ -56,15 +57,29 @@ class PDHGLayer(MessagePassing):
         self.tau = tau
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
+        self.dual_scaling = -1 if negative_dual else 0
 
     def identity_initialization(self):
-        mlps = [self.f_edge_up, self.f_edge_agg, self.f_node_up, self.residual_linear_layer, self.nf_linear_layer, self.aggregation_linear_layer]
+        modules = [
+            self.f_edge_up,
+            self.f_edge_agg,
+            self.residual_linear_layer,
+            self.nf_linear_layer,
+            self.aggregation_linear_layer,
+            *[m for m in self.f_node_up if isinstance(m, nn.Linear)],
+        ]
         with torch.no_grad():
-            for mlp in mlps:
-                mlp.zero_()
-                k = min(mlp.weight.shape)
-                mlp.weight[:k, :k] = torch.eye(k)
-    
+            for layer in modules:
+                layer.weight.zero_()
+                k = min(layer.weight.shape)
+                layer.weight[:k, :k] = torch.eye(
+                    k,
+                    device=layer.weight.device,
+                    dtype=layer.weight.dtype,
+                )
+                if layer.bias is not None:
+                    layer.bias.zero_()
+        
     def forward(self, h, e, edge_index, w, x):
         sqrtw = w.sqrt().view(-1,1)
         src, dst = edge_index
@@ -82,7 +97,7 @@ class PDHGLayer(MessagePassing):
         agg = self.propagate(edge_index, edge_attr=dual)
         '''second equation'''
         # node_input = self.nf_linear_layer(h) +  self.aggregation_linear_layer(agg)
-        node_input = self.nf_linear_layer(h.float()) + self.residual_linear_layer(x.float()) + self.aggregation_linear_layer(agg.float())
+        node_input = self.nf_linear_layer(h.float()) + self.residual_linear_layer(x.float()) + self.dual_scaling*self.aggregation_linear_layer(agg.float())
         # node_input = torch.cat([h, x, agg], dim=-1)
         # node_input = torch.cat([h, agg], dim=-1)
         h_new = self.f_node_up(node_input)
@@ -109,6 +124,7 @@ class GraphPDHGNet(nn.Module):
                  sigma=0.1, 
                  projection='project_l2',
                  activation='SiLU',
+                 negative_dual=False,
                  **kwargs):
         super().__init__()
 
@@ -132,7 +148,8 @@ class GraphPDHGNet(nn.Module):
                 tau=tau,
                 sigma=sigma,
                 activation=activation,
-                projection=projection
+                projection=projection,
+                negative_dual=negative_dual
             )
         )
 
@@ -148,7 +165,8 @@ class GraphPDHGNet(nn.Module):
                     tau=tau,
                     sigma=sigma,
                     activation=activation,
-                    projection=projection
+                    projection=projection,
+                    negative_dual=negative_dual
                 )
             )
         layers.append(PDHGLayer(
@@ -160,13 +178,14 @@ class GraphPDHGNet(nn.Module):
                     tau=tau,
                     sigma=sigma,
                     activation=activation,
-                    projection=projection
+                    projection=projection,
+                    negative_dual=negative_dual
                 ))
         self.layers = nn.ModuleList(layers)
         self.hidden_dim = hidden_dim
         
     def identity_initialization(self):
-        with torch.no_grad:
+        with torch.no_grad():
             for layer in self.layers:
                 layer.identity_initialization()
     
@@ -229,23 +248,29 @@ class EncodeProcessDecode(torch.nn.Module):
                  residual_stream = True,
                  load_processor_parameters: str | None = None,
                  projection='project_l2',
+                 simple_decoding=False,
+                 encoder_decoder_act='SiLU'
                 ):
         """
         Recurrent encode-processor-decode model.
         Processor config can be 
         """
         super().__init__()
-        
-        self.node_encoder = MLP([in_node_dim, mlp_hidden_dim, embedding_dim])
-        self.edge_encoder = MLP([in_edge_dim, mlp_hidden_dim, embedding_dim])
+        self.encoder_decoder_act = globals()[encoder_decoder_act]()
+        self.node_encoder = MLP([in_node_dim, mlp_hidden_dim, embedding_dim], act=self.encoder_decoder_act)
+        self.edge_encoder = MLP([in_edge_dim, mlp_hidden_dim, embedding_dim], act=self.encoder_decoder_act)
 
         out_dim = in_node_dim # out_dim=in_node_dim as we need to recover centroids
         if residual_stream:
             self.node_decoder = MLP([2 * embedding_dim, mlp_hidden_dim, out_dim])
             self.edge_decoder = MLP([2 * embedding_dim, mlp_hidden_dim, out_dim])
         else:
-            self.node_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim])
-            self.edge_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim])
+            if simple_decoding:
+                self.node_decoder = nn.Linear(embedding_dim, out_dim)
+                self.edge_decoder = nn.Linear(embedding_dim, out_dim)
+            else:
+                self.node_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim])
+                self.edge_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim])
         
         # Load processor
         processor_class = globals()[processor_cfg['model']]
@@ -266,6 +291,16 @@ class EncodeProcessDecode(torch.nn.Module):
         self.lam = lam
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
+
+    def identity_initialization(self):
+        mlps = [self.node_encoder, self.edge_encoder, self.node_decoder, self.edge_decoder]
+        with torch.no_grad():
+            for mlp in mlps:
+                for layer in mlp.lins:
+                    torch.nn.init.zeros_(layer.weight)
+                    k = min(layer.weight.shape)
+                    layer.weight[:k, :k] = torch.eye(k)
+        self.processor.identity_initialization()
 
     def forward(self, h, e, edge_index, w, x, **kwargs):
         h_input = self.node_encoder(h)

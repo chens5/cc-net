@@ -1,0 +1,33 @@
+dataset:
+  type: fashion_mnist
+  params:
+    n_samples: 50
+    n_graphs: 100
+    seed: 32
+    k: 10
+  validation:
+    use_train: False
+model_config:
+  model: EncodeProcessDecode
+  cfg:
+    processor_cfg:
+      model: GraphPDHGNet
+      cfg:
+        layer_type: PDHGLayer
+        hidden_dim: 128
+        num_layers: 5
+        tau: 0.35
+        sigma: 0.35
+    in_node_dim: 30
+    in_edge_dim: 30
+    embedding_dim: 128
+    mlp_hidden_dim: 128
+    lam: 1.0
+    residual_stream: False
+    recurrent_steps: 1
+device: cuda:5
+epochs: 500
+loss_function: energy_pdg
+lr: 0.0001
+batch_size: 12
+
