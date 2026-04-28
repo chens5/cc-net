@@ -269,8 +269,8 @@ class EncodeProcessDecode(torch.nn.Module):
                 self.node_decoder = nn.Linear(embedding_dim, out_dim)
                 self.edge_decoder = nn.Linear(embedding_dim, out_dim)
             else:
-                self.node_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim])
-                self.edge_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim])
+                self.node_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim], act=self.encoder_decoder_act)
+                self.edge_decoder = MLP([embedding_dim, mlp_hidden_dim, out_dim], act=self.encoder_decoder_act)
         
         # Load processor
         processor_class = globals()[processor_cfg['model']]
