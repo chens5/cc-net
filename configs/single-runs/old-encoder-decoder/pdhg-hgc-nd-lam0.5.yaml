@@ -26,10 +26,10 @@ model_config:
     in_edge_dim: 2
     embedding_dim: 128
     mlp_hidden_dim: 128
-    lam: 0.0
+    lam: 0.5
     residual_stream: False
     recurrent_steps: 1
-    simple_decoding: True
+    encoder_decoder_act: ReLU
 device: cuda:5
 epochs: 500
 loss_function: energy_pdg

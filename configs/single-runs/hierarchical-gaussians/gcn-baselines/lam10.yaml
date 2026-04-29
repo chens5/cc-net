@@ -3,7 +3,7 @@ dataset:
   params:
     n_graphs: 1000
     branching: [2, 2, 2]
-    level_scales: [15.0, 6.0, 2.0]
+    level_scales: [13.0, 6.0, 2.0]
     points_per_leaf: 10
     seed: 42
     k: 15
@@ -14,9 +14,9 @@ model_config:
   model: EncodeProcessDecode
   cfg:
     processor_cfg:
-      model: GraphPDHGNet
+      model: GNNBaseline
       cfg:
-        layer_type: PDHGLayer
+        layer_type: GCNConv
         hidden_dim: 256
         num_layers: 5
         tau: 0.35
@@ -26,12 +26,12 @@ model_config:
     in_edge_dim: 2
     embedding_dim: 128
     mlp_hidden_dim: 128
-    lam: 0.0
+    lam: 10
     residual_stream: False
     recurrent_steps: 1
-    simple_decoding: True
-device: cuda:5
-epochs: 500
+    encoder_decoder_act: SiLU
+device: cuda:6
+epochs: 1000
 loss_function: energy_pdg
 lr: 0.0001
 batch_size: 64

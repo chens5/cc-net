@@ -21,7 +21,7 @@ model_config:
         num_layers: 5
         tau: 0.35
         sigma: 0.35
-        negative_dual: False
+        encoder_decoder_act: ReLU
     in_node_dim: 2
     in_edge_dim: 2
     embedding_dim: 128
@@ -29,7 +29,6 @@ model_config:
     lam: 0.0
     residual_stream: False
     recurrent_steps: 1
-    simple_decoding: True
 device: cuda:5
 epochs: 500
 loss_function: energy_pdg

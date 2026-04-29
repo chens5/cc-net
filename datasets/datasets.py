@@ -31,10 +31,36 @@ def generate_wordnet_embeddings():
 
     # Matrix of embeddings
     X = np.stack([model[w] for w in words])
+    return X, np.array(words)
 
-    print(len(words))
-    print(X.shape)
-    return  
+def _generate_wordnet_graphs(n_graphs, n_samples, which='train',k=10, **kwargs):
+    X, words = generate_wordnet_embeddings()
+
+    # Normalize embeddings
+    X = X - X.mean(axis=0, keepdims=True)
+    r = np.linalg.norm(X, axis=1).max()
+    X = X / max(r, 1e-12)
+    dataset = []
+
+    for _ in range(n_graphs):
+        graph_sz = np.random.randint(low=n_samples-50, high=n_samples)
+        sampled_nodes = np.random.choice(len(X), size=graph_sz)
+
+        X_feat = X[sampled_nodes]
+        word_labels = words[sampled_nodes]
+
+        W = gl.weightmatrix.knn(X_feat, k=k, kernel='gaussian')
+        W.setdiag(0); W.eliminate_zeros()
+        W = _patch_to_connected(W)
+
+        data = utils.graphlearning_to_pyg(X_feat, W)
+        data.labels = word_labels
+        dataset.append(data)
+        
+    return dataset
+
+def wordnet_graphs(params):
+    return _generate_wordnet_graphs(**params)
 
 ### Functions for generating hierarchical gaussian dataset. 
 def generate_recursive_hierarchy(
@@ -78,7 +104,8 @@ def generate_recursive_hierarchy(
 
     return np.vstack(X), labels
 
-def _generate_hierarchical_blobs(n_graphs, branching,normalize=True, points_per_leaf=20, level_scales=None, dim=2, seed=42,k=10, **kwargs):
+def _generate_hierarchical_blobs(n_graphs, branching,normalize=True, points_per_leaf=20, 
+                                 level_scales=None, dim=2, seed=42,k=10, **kwargs):
     dataset = []
     for _ in trange(n_graphs):
         X, labels = generate_recursive_hierarchy(
