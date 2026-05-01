@@ -10,7 +10,7 @@ import scipy.sparse as sp
 from scipy.sparse import coo_matrix, triu
 
 from tqdm import tqdm
-from torch_geometric.nn import GCNConv, GATConv
+from torch_geometric.nn import GCNConv, GATConv, GINEConv
 import torch.nn.functional as F
 from torch.nn import ReLU, LeakyReLU, Sigmoid, SiLU
 
@@ -106,6 +106,31 @@ class PDHGLayer(MessagePassing):
 
     def message(self, edge_attr):
         return edge_attr
+
+class GINELayer(MessagePassing):
+    def __init__(self, in_node_dim,
+                 out_dim,
+                 edge_dim,
+                 **kwargs):
+        super(GINELayer, self).__init__() 
+        mlp = MLP([in_node_dim, 2*in_node_dim, out_dim], num_layers=2)
+        self.layer = GINEConv(mlp, edge_dim=edge_dim)
+    
+    def forward(self, x, edge_index, edge_attr):
+        return self.layer(x, edge_index, edge_attr)
+
+class GCNLayer(torch.nn.Module):
+    def __init__(self, in_node_dim, out_dim, edge_dim, **kwargs):
+        super().__init__()
+        self.conv1 = GCNConv(in_node_dim, out_dim)
+
+    def forward(self, x, edge_index, edge_attr):
+        # edge_attr should be shape [num_edges] or [num_edges, 1]
+        edge_weight = edge_attr.view(-1)
+
+        x = self.conv1(x, edge_index, edge_weight=edge_attr)
+
+        return x
 
 class GraphPDHGNet(nn.Module):
     """
@@ -249,7 +274,8 @@ class EncodeProcessDecode(torch.nn.Module):
                  load_processor_parameters: str | None = None,
                  projection='project_l2',
                  simple_decoding=False,
-                 encoder_decoder_act='SiLU'
+                 encoder_decoder_act='SiLU',
+                 num_enc_dec_layers=2, 
                 ):
         """
         Recurrent encode-processor-decode model.
@@ -257,8 +283,12 @@ class EncodeProcessDecode(torch.nn.Module):
         """
         super().__init__()
         self.encoder_decoder_act = globals()[encoder_decoder_act]()
-        self.node_encoder = MLP([in_node_dim, mlp_hidden_dim, embedding_dim], act=self.encoder_decoder_act)
-        self.edge_encoder = MLP([in_edge_dim, mlp_hidden_dim, embedding_dim], act=self.encoder_decoder_act)
+        self.node_encoder = MLP([in_node_dim, mlp_hidden_dim, embedding_dim], 
+                                 num_layers=num_enc_dec_layers, 
+                                 act=self.encoder_decoder_act)
+        self.edge_encoder = MLP([in_edge_dim, mlp_hidden_dim, embedding_dim], 
+                                 num_layers=num_enc_dec_layers, 
+                                 act=self.encoder_decoder_act)
 
         out_dim = in_node_dim # out_dim=in_node_dim as we need to recover centroids
         if residual_stream:

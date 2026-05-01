@@ -16,7 +16,7 @@ model_config:
     processor_cfg:
       model: GNNBaseline
       cfg:
-        layer_type: GCNConv
+        layer_type: GCNLayer
         hidden_dim: 256
         num_layers: 5
         tau: 0.35

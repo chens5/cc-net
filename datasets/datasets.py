@@ -17,7 +17,7 @@ def generate_wordnet_embeddings():
     import gensim.downloader as gensim_api
     from nltk.corpus import wordnet as wn
     nltk.download("wordnet")
-    model = api.load("word2vec-google-news-300")
+    model = gensim_api.load("word2vec-google-news-300")
 
     wordnet_words = sorted({
     lemma.name().lower()

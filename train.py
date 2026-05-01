@@ -37,8 +37,8 @@ def compute_validation_loss(val_dataloader, model, loss_func, lam, device):
             dst = batch.edge_index[1]
             e_init = batch.x[src] - batch.x[dst]
 
-            h, e, h_latent = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr.float(),x=batch.x.float())
-            loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam,'U_latent': h_latent}
+            h, e = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr.float(),x=batch.x.float())
+            loss_terms = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam}
             loss = loss_func(**loss_terms)
             primal_obj_,fidelity, fusion = losses.energy(**loss_terms, return_parts = True)
             avg_fidelity += fidelity.item()/batch.num_graphs
@@ -63,7 +63,7 @@ def compute_kkt_residuals(val_dataloader, model, lam, device, eps=1e-8):
             dst = batch.edge_index[1]
             e_init = batch.x[src] - batch.x[dst]
 
-            h, e, _ = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr.float(), x=batch.x.float())
+            h, e = model(h=batch.x.float(), e=e_init.float(), edge_index=batch.edge_index,w=batch.edge_attr.float(), x=batch.x.float())
             kkt_dict = losses.kkt_residuals(h, e, batch.x, src, dst, batch.edge_attr, lam)
             for key in return_dict:
                 return_dict[key] += kkt_dict[key]
@@ -73,6 +73,7 @@ def compute_kkt_residuals(val_dataloader, model, lam, device, eps=1e-8):
 
 def train(train_dataset, val_dataset,dataset_str, model_config, device, 
           epochs, loss_function, lr, batch_size=1, checkpoint_epoch=10, 
+          identity_initialization=False,
           **kwargs):
     '''
     Training pipeline for model
@@ -98,6 +99,9 @@ def train(train_dataset, val_dataset,dataset_str, model_config, device,
     model = model_class(**model_config['cfg'])
     model = model.float()
     model = model.to(device)
+    
+    if identity_initialization:
+        model.identity_initialization()
 
     # Set config for lambda
     assert 'lam' in model_config['cfg']
@@ -160,7 +164,7 @@ def train(train_dataset, val_dataset,dataset_str, model_config, device,
             src = batch.edge_index[0]
             dst = batch.edge_index[1]
             e_init = batch.x[src] - batch.x[dst]
-            h, e, h_latent = model(h=batch.x.float(), 
+            h, e = model(h=batch.x.float(), 
                          e=e_init.float(), 
                          edge_index=batch.edge_index, 
                          w=batch.edge_attr.float(),
@@ -168,8 +172,7 @@ def train(train_dataset, val_dataset,dataset_str, model_config, device,
             temp = {'U': h, 'X': batch.x, 
                     'src': src, 'dst': dst, 
                     'P': e, 'w': batch.edge_attr, 
-                    'lam': lam,  
-                    'U_latent': h_latent}
+                    'lam': lam}
             # temp = {'U': h, 'X': batch.x, 'src': src, 'dst': dst, 'P': e, 'w': batch.edge_attr, 'lam': lam, 'gt_U': batch.U, 'gt_P':batch.P, 'U_latent': h_latent}
             loss = loss_func(**temp)/batch.num_graphs
             loss.backward()

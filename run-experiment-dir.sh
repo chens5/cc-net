@@ -1,5 +1,5 @@
 
-CONFIG_DIR="configs/single-runs/new-encoder-decoder"
+CONFIG_DIR="configs/single-runs/wordnet/gcn-baselines"
 LOG_DIR="logs"
 
 config_prefix="$(echo "$CONFIG_DIR" | sed 's#[/ ]#_#g')"
