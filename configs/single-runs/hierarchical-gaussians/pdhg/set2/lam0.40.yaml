@@ -1,33 +1,37 @@
 dataset:
-  type: wordnet_graphs
+  type: hierarchical_blobs
   params:
     n_graphs: 1000
-    n_samples: 100
+    branching: [2, 2, 2]
+    level_scales: [13.0, 6.0, 2.0]
+    points_per_leaf: 10
+    seed: 42
     k: 15
+    normalize: True
   validation:
     use_train: True
 model_config:
   model: EncodeProcessDecode
   cfg:
     processor_cfg:
-      model: GNNBaseline
+      model: GraphPDHGNet
       cfg:
-        layer_type: GATConv
-        hidden_dim: 600
+        layer_type: PDHGLayer
+        hidden_dim: 256
         num_layers: 5
         tau: 0.35
         sigma: 0.35
         negative_dual: False
-    in_node_dim: 300
-    in_edge_dim: 300
-    embedding_dim: 300
-    mlp_hidden_dim: 600
-    lam: 1.0
+    in_node_dim: 2
+    in_edge_dim: 2
+    embedding_dim: 128
+    mlp_hidden_dim: 128
+    lam: 0.40
     residual_stream: False
     recurrent_steps: 1
     encoder_decoder_act: SiLU
-device: cuda:5
-epochs: 500
+device: cuda:0
+epochs: 1000
 loss_function: energy_pdg
 lr: 0.0001
 batch_size: 64

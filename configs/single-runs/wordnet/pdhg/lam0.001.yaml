@@ -13,21 +13,21 @@ model_config:
       model: GraphPDHGNet
       cfg:
         layer_type: PDHGLayer
-        hidden_dim: 256
-        num_layers: 3
+        hidden_dim: 600
+        num_layers: 5
         tau: 0.35
         sigma: 0.35
         negative_dual: False
     in_node_dim: 300
     in_edge_dim: 300
-    embedding_dim: 128
-    mlp_hidden_dim: 128
+    embedding_dim: 300
+    mlp_hidden_dim: 600
     lam: 0.001
     residual_stream: False
     recurrent_steps: 1
     encoder_decoder_act: SiLU
-device: cuda:5
-epochs: 1000
+device: cuda:7
+epochs: 500
 loss_function: energy_pdg
 lr: 0.0001
 batch_size: 64
