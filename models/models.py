@@ -22,6 +22,13 @@ from tqdm import trange
 from . import model_utils as mutils
 
 
+def _projection_kwargs(tau, projection_kwargs):
+    kwargs = {"tau": tau}
+    if projection_kwargs is not None:
+        kwargs.update(projection_kwargs)
+    return kwargs
+
+
 class PDHGLayer(MessagePassing):
     def __init__(self, node_dim, 
                        edge_dim, 
@@ -32,6 +39,7 @@ class PDHGLayer(MessagePassing):
                        tau = 0.35, 
                        sigma = 0.1,
                        projection='project_l2',
+                       projection_kwargs=None,
                        negative_dual=False,  
                        **kwargs):
         super().__init__(aggr='sum')
@@ -57,6 +65,7 @@ class PDHGLayer(MessagePassing):
         self.tau = tau
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
+        self.projection_kwargs = _projection_kwargs(tau, projection_kwargs)
         self.dual_scaling = -1 if negative_dual else 0
 
     def identity_initialization(self):
@@ -91,7 +100,7 @@ class PDHGLayer(MessagePassing):
         edge_update = edge_up + edge_agg
 
         r = self.lam * sqrtw
-        e_proj = self.projection(edge_update, r) # Normalization 
+        e_proj = self.projection(edge_update, r, **self.projection_kwargs) # Normalization 
         dual = sqrtw.float() * e_proj
         edge_index = edge_index.long()
         agg = self.propagate(edge_index, edge_attr=dual)
@@ -148,6 +157,7 @@ class GraphPDHGNet(nn.Module):
                  tau=0.35,
                  sigma=0.1, 
                  projection='project_l2',
+                 projection_kwargs=None,
                  activation='SiLU',
                  negative_dual=False,
                  **kwargs):
@@ -158,6 +168,7 @@ class GraphPDHGNet(nn.Module):
         
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
+        self.projection_kwargs = _projection_kwargs(tau, projection_kwargs)
 
         layers = []
         residual_dim = in_node_dim
@@ -174,6 +185,7 @@ class GraphPDHGNet(nn.Module):
                 sigma=sigma,
                 activation=activation,
                 projection=projection,
+                projection_kwargs=projection_kwargs,
                 negative_dual=negative_dual
             )
         )
@@ -191,6 +203,7 @@ class GraphPDHGNet(nn.Module):
                     sigma=sigma,
                     activation=activation,
                     projection=projection,
+                    projection_kwargs=projection_kwargs,
                     negative_dual=negative_dual
                 )
             )
@@ -204,6 +217,7 @@ class GraphPDHGNet(nn.Module):
                     sigma=sigma,
                     activation=activation,
                     projection=projection,
+                    projection_kwargs=projection_kwargs,
                     negative_dual=negative_dual
                 ))
         self.layers = nn.ModuleList(layers)
@@ -273,6 +287,7 @@ class EncodeProcessDecode(torch.nn.Module):
                  residual_stream = True,
                  load_processor_parameters: str | None = None,
                  projection='project_l2',
+                 projection_kwargs=None,
                  simple_decoding=False,
                  encoder_decoder_act='SiLU',
                  num_enc_dec_layers=2, 
@@ -321,6 +336,8 @@ class EncodeProcessDecode(torch.nn.Module):
         self.lam = lam
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
+        projection_tau = processor_cfg.get('cfg', {}).get('tau', 1.0)
+        self.projection_kwargs = _projection_kwargs(projection_tau, projection_kwargs)
 
     def identity_initialization(self):
         mlps = [self.node_encoder, self.edge_encoder, self.node_decoder, self.edge_decoder]
@@ -347,7 +364,7 @@ class EncodeProcessDecode(torch.nn.Module):
 
         sqrtw = w.sqrt().view(-1,1)
         r = self.lam * sqrtw
-        e_out = self.projection(e_out, r) # Normalization 
+        e_out = self.projection(e_out, r, **self.projection_kwargs) # Normalization 
         return h_out, e_out
 
 def LinearAndNorm(in_dim, out_dim):
@@ -366,6 +383,7 @@ class PDHGLayerNorm(MessagePassing):
                        tau = 0.35, 
                        sigma = 0.1,
                        projection='project_l2', 
+                       projection_kwargs=None,
                        **kwargs):
         super().__init__(aggr='sum')
         '''functions for the equations'''
@@ -392,6 +410,7 @@ class PDHGLayerNorm(MessagePassing):
         self.tau = tau
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
+        self.projection_kwargs = _projection_kwargs(tau, projection_kwargs)
 
     def identity_initialization(self):
         mlps = [self.f_edge_up, self.f_edge_agg, self.f_node_up, self.residual_linear_layer, self.nf_linear_layer, self.aggregation_linear_layer]
@@ -412,7 +431,7 @@ class PDHGLayerNorm(MessagePassing):
         edge_update = edge_up + edge_agg
 
         r = self.lam * sqrtw
-        e_proj = self.projection(edge_update, r) # Normalization 
+        e_proj = self.projection(edge_update, r, **self.projection_kwargs) # Normalization 
         dual = sqrtw.float() * e_proj
         edge_index = edge_index.long()
         agg = self.propagate(edge_index, edge_attr=dual)
@@ -444,6 +463,7 @@ class GraphPDHGNetNorm(nn.Module):
                  tau=0.35,
                  sigma=0.1, 
                  projection='project_l2',
+                 projection_kwargs=None,
                  activation='SiLU',
                  **kwargs):
         super().__init__()
@@ -453,6 +473,7 @@ class GraphPDHGNetNorm(nn.Module):
         
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
+        self.projection_kwargs = _projection_kwargs(tau, projection_kwargs)
 
         layers = []
         residual_dim = in_node_dim
@@ -468,7 +489,8 @@ class GraphPDHGNetNorm(nn.Module):
                 tau=tau,
                 sigma=sigma,
                 activation=activation,
-                projection=projection
+                projection=projection,
+                projection_kwargs=projection_kwargs
             )
         )
 
@@ -484,7 +506,8 @@ class GraphPDHGNetNorm(nn.Module):
                     tau=tau,
                     sigma=sigma,
                     activation=activation,
-                    projection=projection
+                    projection=projection,
+                    projection_kwargs=projection_kwargs
                 )
             )
         layers.append(PDHGLayer(
@@ -496,7 +519,8 @@ class GraphPDHGNetNorm(nn.Module):
                     tau=tau,
                     sigma=sigma,
                     activation=activation,
-                    projection=projection
+                    projection=projection,
+                    projection_kwargs=projection_kwargs
                 ))
         self.layers = nn.ModuleList(layers)
         self.hidden_dim = hidden_dim
