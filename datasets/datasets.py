@@ -4,6 +4,8 @@ import sklearn.datasets as datasets
 import torch
 import graphlearning as gl
 
+from .expander import hierarchical_expanders
+
 from scipy.sparse import coo_matrix, triu
 from scipy.sparse.csgraph import connected_components, laplacian as csgraph_laplacian
 from scipy.sparse.linalg import eigsh
