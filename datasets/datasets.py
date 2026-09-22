@@ -12,6 +12,57 @@ from . import dataset_utils as utils
 
 from tqdm import trange
 
+def generate_wordnet_animal_embeddings():
+    import re
+
+    import gensim.downloader as gensim_api
+    import nltk
+    import numpy as np
+    from nltk.corpus import wordnet as wn
+
+    nltk.download("wordnet")
+
+    model = gensim_api.load("word2vec-google-news-300")
+
+    def get_all_hyponyms(root_synset):
+        """Return all descendant synsets of a WordNet synset."""
+        descendants = set()
+        stack = [root_synset]
+
+        while stack:
+            current = stack.pop()
+
+            for child in current.hyponyms():
+                if child not in descendants:
+                    descendants.add(child)
+                    stack.append(child)
+
+        return descendants
+
+    # Collect all synsets below animal.n.01.
+    animal_root = wn.synset("animal.n.01")
+    animal_synsets = get_all_hyponyms(animal_root)
+
+    # Collect single-token animal names.
+    animal_words = sorted({
+        lemma.name().lower()
+        for synset in animal_synsets
+        for lemma in synset.lemmas()
+        if re.fullmatch(r"[A-Za-z]+", lemma.name())
+    })
+
+    # Keep only words available in the embedding model.
+    words = [word for word in animal_words if word in model.key_to_index]
+
+    if not words:
+        raise ValueError(
+            "No WordNet animal words were found in the embedding model."
+        )
+
+    X = np.stack([model[word] for word in words])
+
+    return X, np.array(words)
+
 def generate_wordnet_embeddings():
     import nltk
     import gensim.downloader as gensim_api
@@ -34,8 +85,8 @@ def generate_wordnet_embeddings():
     return X, np.array(words)
 
 def _generate_wordnet_graphs(n_graphs, n_samples, which='train',k=10, **kwargs):
-    X, words = generate_wordnet_embeddings()
-
+    X, words = generate_wordnet_animal_embeddings()
+    print("Finished generating wordnet embeddings")
     # Normalize embeddings
     X = X - X.mean(axis=0, keepdims=True)
     r = np.linalg.norm(X, axis=1).max()
@@ -56,7 +107,7 @@ def _generate_wordnet_graphs(n_graphs, n_samples, which='train',k=10, **kwargs):
         data = utils.graphlearning_to_pyg(X_feat, W)
         data.labels = word_labels
         dataset.append(data)
-        
+    print("Finished generating dataset")
     return dataset
 
 def wordnet_graphs(params):

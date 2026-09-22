@@ -40,7 +40,8 @@ class PDHGLayer(MessagePassing):
                        sigma = 0.1,
                        projection='project_l2',
                        projection_kwargs=None,
-                       negative_dual=False,  
+                       negative_dual=False,
+                       no_edge_memory=False,
                        **kwargs):
         super().__init__(aggr='sum')
         '''functions for the equations'''
@@ -66,7 +67,9 @@ class PDHGLayer(MessagePassing):
         projection_fn = getattr(mutils, projection)
         self.projection = projection_fn
         self.projection_kwargs = _projection_kwargs(tau, projection_kwargs)
-        self.dual_scaling = -1 if negative_dual else 0
+        self.dual_scaling = -1 if negative_dual else 1
+        if no_edge_memory:
+            self.dual_scaling = 0
 
     def identity_initialization(self):
         modules = [
@@ -160,6 +163,7 @@ class GraphPDHGNet(nn.Module):
                  projection_kwargs=None,
                  activation='SiLU',
                  negative_dual=False,
+                 no_edge_memory=False,
                  **kwargs):
         super().__init__()
 
@@ -186,7 +190,8 @@ class GraphPDHGNet(nn.Module):
                 activation=activation,
                 projection=projection,
                 projection_kwargs=projection_kwargs,
-                negative_dual=negative_dual
+                negative_dual=negative_dual,
+                no_edge_memory=no_edge_memory,
             )
         )
 
@@ -218,7 +223,8 @@ class GraphPDHGNet(nn.Module):
                     activation=activation,
                     projection=projection,
                     projection_kwargs=projection_kwargs,
-                    negative_dual=negative_dual
+                    negative_dual=negative_dual,
+                    no_edge_memory=no_edge_memory,
                 ))
         self.layers = nn.ModuleList(layers)
         self.hidden_dim = hidden_dim

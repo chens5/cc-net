@@ -30,7 +30,7 @@ model_config:
     residual_stream: False
     recurrent_steps: 1
     encoder_decoder_act: SiLU
-device: cuda:6
+device: cuda:5
 epochs: 1000
 loss_function: energy_pdg
 lr: 0.0001
